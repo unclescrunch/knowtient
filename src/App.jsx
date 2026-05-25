@@ -203,7 +203,7 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     if (!item) return 0;
     const cardIW = IW - px(36);
     // Tag
-    const tagH = px(50);
+    const tagH = px(26) + px(20);  // matches drawCard: tagFontSz + gap
     // Question: fit to 4 lines max
     const qSz  = fitFont(item.q.question, px(36), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
@@ -226,6 +226,7 @@ function drawShareCanvas(avg, guesses, round, width, height) {
                + cardBH + CARD_GAP + cardWH + CTA_PAD + CTA_MIN_H + V_PAD;
 
   // ── PASS 2: compute global scale factor ──
+  // GS: scale DOWN if content overflows, but never scale UP (avoids card overflow)
   const GS = totalH > H ? (H / totalH) : 1.0;
   const g  = n => Math.round(n * GS); // apply global scale on top of base
 
@@ -278,11 +279,13 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     const cardIW = IW - g(px(36));
     let cy = cardY + g(px(18));
 
-    // Tag
-    ctx.font = `700 ${g(px(26))}px 'DM Mono',monospace`;
+    // Tag — draw and advance by actual font size to avoid overlap
+    const tagFontSz = g(px(26));
+    ctx.font = `700 ${tagFontSz}px 'DM Mono',monospace`;
     ctx.fillStyle = bc;
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(28)));
-    cy += g(px(28)) + g(px(22));
+    const tagY = cy + tagFontSz;
+    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), tagY);
+    cy += tagFontSz + g(px(20));  // advance by actual rendered font size + gap
 
     // Question — dynamic font, full text, up to 4 lines
     const qSz = fitFont(item.q.question, g(px(36)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
@@ -1077,19 +1080,18 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
             </div>
             <div className="reveal-bar-reality-label">reality: {realPct}%</div>
           </div>
-          {showDelta ? (
-            <>
-              <div className="reveal-delta-row delta-bounce" style={{display:"none"}}>
-                <div className={`reveal-delta-number ${cls}`}></div>
-              </div>
-              <div className={`reveal-voice-label delta-bounce ${cls}`} style={{animationDelay:"60ms"}}>{voiceLabel(delta)}</div>
-            </>
-          ) : (
-            <>
-              <div className="reveal-delta-row" style={{visibility:"hidden"}}><div className="reveal-delta-number">—</div></div>
-              <div className="reveal-voice-label" style={{visibility:"hidden",minHeight:"38px"}}>—</div>
-            </>
-          )}
+          {/* Always in DOM — opacity transition so layout never shifts */}
+          <div className="reveal-delta-row" style={{display:"none"}}>
+            <div className={`reveal-delta-number ${cls}`}></div>
+          </div>
+          <div
+            className={`reveal-voice-label ${cls}`}
+            style={{
+              opacity: showDelta ? 1 : 0,
+              transition: "opacity 0.3s ease",
+              minHeight: "38px",
+            }}
+          >{voiceLabel(delta)}</div>
           <div className="reveal-question-recap">
             <div className="reveal-recap-q">{question.question}</div>
             <div className={isFail?"card-big-miss reveal-answer-card":"card reveal-answer-card"}>
