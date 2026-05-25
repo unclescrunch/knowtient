@@ -203,18 +203,18 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     if (!item) return 0;
     const cardIW = IW - px(36);
     // Tag
-    const tagH = px(32);
+    const tagH = px(48);
     // Question: fit to 4 lines max
-    const qSz  = fitFont(item.q.question, px(30), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
+    const qSz  = fitFont(item.q.question, px(36), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
     const qH   = countLines(item.q.question, cardIW) * Math.round(qSz * 1.4);
     // Answer: fit to 4 lines max, full text no truncation
     const ansT = `Correct answer: ${item.q.correct_answer}`;
-    const aSz  = fitFont(ansT, px(24), "$px 'Space Grotesk',sans-serif", cardIW, 4);
+    const aSz  = fitFont(ansT, px(30), "$px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
     const aH   = countLines(ansT, cardIW) * Math.round(aSz * 1.4);
     // Nums row
-    const numRowH = px(78);
+    const numRowH = px(100);
     // Padding: top + tag + gap + q + gap + a + gap + nums + bottom
     return px(18) + tagH + px(10) + qH + px(8) + aH + px(12) + numRowH + px(18);
   };
@@ -251,7 +251,7 @@ function drawShareCanvas(avg, guesses, round, width, height) {
   const subSz = g(px(38));
   ctx.font = `700 ${subSz}px 'Space Grotesk',sans-serif`;
   ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
-  y = drawWC("What % of Americans answered questions correctly?", W/2, y + g(px(10)), IW, Math.round(subSz*1.35));
+  y = drawWC("What % of Americans answered correctly?", W/2, y + g(px(10)), IW, Math.round(subSz*1.35));
 
   // Avg intro
   const introSz = g(px(30));
@@ -279,13 +279,13 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     let cy = cardY + g(px(18));
 
     // Tag
-    ctx.font = `700 ${g(px(22))}px 'DM Mono',monospace`;
+    ctx.font = `700 ${g(px(26))}px 'DM Mono',monospace`;
     ctx.fillStyle = bc;
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(28)));
-    cy += g(px(32)) + g(px(10));
+    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(30)));
+    cy += g(px(30)) + g(px(18));
 
     // Question — dynamic font, full text, up to 4 lines
-    const qSz = fitFont(item.q.question, g(px(30)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
+    const qSz = fitFont(item.q.question, g(px(36)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
     ctx.fillStyle = "#F5F0E8";
     cy = drawW(item.q.question, PAD+g(px(18)), cy, cardIW, Math.round(qSz*1.4));
@@ -293,7 +293,7 @@ function drawShareCanvas(avg, guesses, round, width, height) {
 
     // Answer — dynamic font, full text, up to 4 lines, no truncation
     const ansT = `Correct answer: ${item.q.correct_answer}`;
-    const aSz  = fitFont(ansT, g(px(24)), "$px 'Space Grotesk',sans-serif", cardIW, 4);
+    const aSz  = fitFont(ansT, g(px(30)), "$px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
     ctx.fillStyle = "#C8C3B8";
     cy = drawW(ansT, PAD+g(px(18)), cy, cardIW, Math.round(aSz*1.4));
@@ -307,9 +307,9 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     ];
     numCols.forEach((nc, ci) => {
       const nx = PAD + g(px(10)) + ci * (IW/3);
-      ctx.font = `${g(px(42))}px Righteous,cursive`; ctx.fillStyle = nc.color;
+      ctx.font = `${g(px(58))}px Righteous,cursive`; ctx.fillStyle = nc.color;
       ctx.fillText(nc.val, nx, cy + g(px(40)));
-      ctx.font = `500 ${g(px(20))}px 'DM Mono',monospace`; ctx.fillStyle = "#C8C3B8";
+      ctx.font = `500 ${g(px(24))}px 'DM Mono',monospace`; ctx.fillStyle = "#C8C3B8";
       ctx.fillText(nc.label, nx, cy + g(px(40)) + g(px(22)));
     });
     return cardY + cardH;
@@ -321,18 +321,19 @@ function drawShareCanvas(avg, guesses, round, width, height) {
   if (best)  { y = drawCard(best,  "best",  y, scaledBH) + g(CARD_GAP); }
   if (worst) { y = drawCard(worst, "worst", y, scaledWH); }
 
-  // CTA — fill remaining space, minimum height guaranteed
+  // CTA — max 25% of canvas height
   const ctaY = y + g(CTA_PAD);
-  const ctaH = Math.max(g(CTA_MIN_H), H - ctaY - g(px(28)));
+  const ctaMaxH = Math.round(H * 0.25);
+  const ctaH = Math.min(ctaMaxH, Math.max(g(CTA_MIN_H), H - ctaY - g(px(28))));
   rr(PAD, ctaY, IW, ctaH, g(px(12)), "#F5A623");
   ctx.textAlign = "center";
-  const cta1Sz = Math.min(g(px(32)), Math.round(ctaH * 0.28));
-  const cta2Sz = Math.min(g(px(42)), Math.round(ctaH * 0.36));
+  const cta1Sz = Math.min(g(px(46)), Math.round(ctaH * 0.32));
+  const cta2Sz = Math.min(g(px(58)), Math.round(ctaH * 0.44));
   ctx.font = `700 ${cta1Sz}px 'Space Grotesk',sans-serif`;
   ctx.fillStyle = "#2D2A5E";
   ctx.fillText("Can you beat it?", W/2, ctaY + ctaH * 0.36);
   ctx.font = `700 ${cta2Sz}px Righteous,cursive`;
-  ctx.fillText("Knowtient.game", W/2, ctaY + ctaH * 0.72);
+  ctx.fillText("Knowtient.com", W/2, ctaY + ctaH * 0.72);
   ctx.textAlign = "left";
 
   return canvas.toDataURL("image/png");
@@ -365,7 +366,7 @@ const PLATFORM_ICONS = {
 
 // Platform configs
 const PLATFORMS = [
-  { id:"linkedin", label:"LinkedIn",  w:1080, h:1350, filename:"knowtient-linkedin.png",  url:"https://www.linkedin.com/sharing/share-offsite/?url=https://knowtient.game", svgKey:"linkedin" },
+  { id:"linkedin", label:"LinkedIn",  w:1080, h:1350, filename:"knowtient-linkedin.png",  url:"https://www.linkedin.com/sharing/share-offsite/?url=https://knowtient.com", svgKey:"linkedin" },
   { id:"ig",       label:"Instagram", w:1080, h:1920, filename:"knowtient-instagram.png", url:"https://www.instagram.com/",              svgKey:"ig" },
   { id:"tiktok",   label:"TikTok",    w:1080, h:1920, filename:"knowtient-tiktok.png",    url:"https://www.tiktok.com/upload",           svgKey:"tiktok" },
   { id:"fb",       label:"Facebook",  w:1080, h:1920, filename:"knowtient-facebook.png",  url:"https://www.facebook.com/",              svgKey:"fb" },
@@ -475,15 +476,15 @@ const GlobalStyles = () => (
     .reveal-delta-number.green { color:var(--color-neon-lime); text-shadow:0 0 12px rgba(198,255,0,0.5); }
     .reveal-delta-number.amber { color:var(--color-amber); text-shadow:0 0 12px rgba(245,166,35,0.4); }
     .reveal-delta-number.red   { color:var(--color-red); text-shadow:0 0 14px rgba(255,45,45,0.6); }
-    .reveal-voice-label { font-family:'Righteous',cursive; font-size:26px; text-align:center; margin-bottom:12px; }
+    .reveal-voice-label { font-family:'Righteous',cursive; font-size:26px; text-align:center; margin-bottom:20px; }
     .reveal-voice-label.green { color:var(--color-neon-lime); text-shadow:0 0 16px rgba(198,255,0,0.6); }
     .reveal-voice-label.amber { color:var(--color-amber); text-shadow:0 0 16px rgba(245,166,35,0.5); }
     .reveal-voice-label.red   { color:var(--color-red); text-shadow:0 0 18px rgba(255,45,45,0.7); }
     .reveal-question-recap { margin-bottom:16px; }
-    .reveal-recap-q { font-family:'Space Grotesk',sans-serif; font-size:23px; font-weight:600; color:var(--color-secondary); line-height:1.4; margin-bottom:10px; padding:0 2px; }
+    .reveal-recap-q { font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:600; color:var(--color-secondary); line-height:1.35; margin-bottom:8px; padding:0 2px; }
     .reveal-answer-card { margin-bottom:16px; }
     .reveal-answer-card-label { font-family:'DM Mono',monospace; font-size:16px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-secondary); margin-bottom:7px; }
-    .reveal-answer-card-text  { font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:500; color:var(--color-text); }
+    .reveal-answer-card-text  { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:500; color:var(--color-text); }
     .reveal-bar-reality-label { display:none; }
     .reveal-bottom { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
     .reveal-tap-hint { font-family:'DM Mono',monospace; font-size:13px; color:var(--color-secondary); text-align:center; opacity:0.55; }
@@ -556,7 +557,7 @@ const GlobalStyles = () => (
     @keyframes fadeIn { from{opacity:0} to{opacity:1} }
     .share-card { background:var(--color-surface); border:2px solid var(--color-border); border-radius:16px; padding:24px 20px; width:100%; max-width:390px; max-height:90dvh; overflow-y:auto; scrollbar-width:none; }
     .share-card::-webkit-scrollbar { display:none; }
-    .share-card-headline { font-family:'Righteous',cursive; font-size:22px; color:#C6FF00; letter-spacing:0.04em; margin-bottom:4px; text-shadow:0 0 12px rgba(198,255,0,0.35); line-height:1.2; display:inline-flex; align-items:baseline; gap:3px; }
+    .share-card-headline { font-family:'Righteous',cursive; font-size:28px; color:#C6FF00; letter-spacing:0.04em; margin-bottom:12px; text-shadow:0 0 12px rgba(198,255,0,0.35); line-height:1.2; display:inline-flex; align-items:baseline; gap:3px; }
     .share-card-subhead  { font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; color:var(--color-text); margin-bottom:4px; }
     .share-card-avg-line { font-family:'Space Grotesk',sans-serif; font-size:15px; color:var(--color-secondary); margin-bottom:2px; }
     .share-score-row  { display:flex; align-items:baseline; gap:6px; margin-bottom:10px; }
@@ -597,7 +598,7 @@ const GlobalStyles = () => (
     .splash-bottom { padding-bottom:40px; display:flex; flex-direction:column; gap:10px; }
     .splash-bottom .btn-primary { font-size:22px; min-height:62px; }
     .splash-source-note { display:none; }
-    .btn-about { background:transparent; border:none; color:var(--color-secondary); font-family:'DM Mono',monospace; font-size:17px; font-weight:700; text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:10px; -webkit-tap-highlight-color:transparent; letter-spacing:0.04em; }
+    .btn-about { background:transparent; border:none; color:var(--color-secondary); font-family:'DM Mono',monospace; font-size:22px; font-weight:700; text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:10px; -webkit-tap-highlight-color:transparent; letter-spacing:0.04em; }
     .btn-about:hover { color:var(--color-text); }
     /* About lightbox */
     .about-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.78); z-index:400; display:flex; align-items:center; justify-content:center; padding:24px; animation:fadeIn 0.2s ease; }
@@ -916,13 +917,12 @@ function SplashScreen({ onStart }) {
               <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">You will see <strong>seven real questions</strong> that Pew Research already asked thousands of Americans.</span></div>
               <div className="splash-rule-divider" />
               <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text"><strong>Your challenge:</strong> guess what % of Americans answered that question correctly.</span></div>
-              <div className="splash-rule-divider" />
-              <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text">The real % of correct answers is revealed.<br/><strong>How close can you get?</strong></span></div>
+
             </div>
           </div>
           <div className="splash-bottom">
             <button className="btn-primary" onClick={onStart}>START ROUND →</button>
-            <button className="btn-about" onClick={() => setShowAbout(true)}>ABOUT THIS GAME</button>
+            <button className="btn-about" onClick={() => setShowAbout(true)}>ABOUT THE DATA</button>
           </div>
         </div>
       </div>
@@ -1232,21 +1232,13 @@ function EndScreen({ round, guesses, onPlayAgain, onShare }) {
 function ShareCard({ guesses, round, onClose }) {
   const avg       = avgDeviation(guesses);
   const mobile    = isMobile();
-  const shareText = `What is your Knowtient? I guessed what % of strangers got trivia answers right. ${avg.toFixed(1)} pts off avg. Knowtient.game`;
+  const shareText = `What is your Knowtient? I guessed what % of strangers got trivia answers right. ${avg.toFixed(1)} pts off avg. Knowtient.com`;
   const [status,   setStatus]   = useState("");
   const [preview,  setPreview]  = useState(null); // data URL for lightbox
   const [prevPlat, setPrevPlat] = useState(null); // which platform is previewed
 
-  // Generate preview on mount for desktop
-  useEffect(() => {
-    if (!mobile) {
-      // Default preview: Instagram size
-      const url = drawShareCanvas(avg, guesses, round, 1080, 1920);
-      setPreview(url);
-      setPrevPlat("ig");
-    }
+  // Preview generated on first platform click — no default
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleMobileShare = async () => {
     setStatus("Preparing…");
@@ -1314,20 +1306,17 @@ function ShareCard({ guesses, round, onClose }) {
           /* ── DESKTOP ── */
           <>
             {/* Lightbox preview */}
-            {preview && (
-              <div style={{
-                width:"100%", borderRadius:12, overflow:"hidden",
-                marginBottom:16, background:"#1a1840",
-                border:"2px solid var(--color-border)",
-                maxHeight:360, display:"flex", alignItems:"center", justifyContent:"center",
-              }}>
-                <img
-                  src={preview}
-                  alt="Share preview"
-                  style={{width:"100%", height:"100%", objectFit:"contain", display:"block", maxHeight:356}}
-                />
-              </div>
-            )}
+            <div style={{
+              width:"100%", borderRadius:12, overflow:"hidden",
+              marginBottom:16, background:"#1a1840",
+              border:"2px solid var(--color-border)",
+              minHeight:180, maxHeight:360, display:"flex", alignItems:"center", justifyContent:"center",
+            }}>
+              {preview
+                ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:356}} />
+                : <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)",padding:24,textAlign:"center"}}>Click a platform icon to preview and save</span>
+              }
+            </div>
             <p style={{
               fontFamily:"'DM Mono',monospace", fontSize:13,
               color:"var(--color-secondary)", textAlign:"center",
@@ -1371,6 +1360,24 @@ function ShareCard({ guesses, round, onClose }) {
 const TOTAL = 7;
 
 export default function App() {
+  useEffect(() => {
+    document.title = "Knowtient — What % of Americans knew that?";
+    const sm = (prop, content, isName=false) => {
+      const sel = isName ? `meta[name="${prop}"]` : `meta[property="${prop}"]`;
+      let el = document.querySelector(sel);
+      if (!el) { el = document.createElement("meta"); isName ? el.setAttribute("name",prop) : el.setAttribute("property",prop); document.head.appendChild(el); }
+      el.setAttribute("content", content);
+    };
+    const desc = "Seven real questions that Pew Research already asked thousands of Americans. Can you guess what % of Americans got each question right?";
+    const title = "Knowtient — What % of Americans knew that?";
+    sm("description", desc, true);
+    sm("og:title", title); sm("og:description", desc);
+    sm("og:image", "https://knowtient.com/og-image.png");
+    sm("og:url", "https://knowtient.com"); sm("og:type", "website");
+    sm("twitter:card", "summary_large_image", true);
+    sm("twitter:title", title, true); sm("twitter:description", desc, true);
+    sm("twitter:image", "https://knowtient.com/og-image.png", true);
+  }, []);
   const [screen,    setScreen]    = useState("title");
   const [round,     setRound]     = useState([]);
   const [qIndex,    setQIndex]    = useState(0);
