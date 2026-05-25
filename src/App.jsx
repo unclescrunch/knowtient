@@ -97,7 +97,7 @@ function playEndChime() {
 }
 
 // ─── SHARE IMAGE GENERATOR ────────────────────────────────────────────────────
-// Mirrors the debrief screen: headline, avg, best card, worst card, CTA
+// Dynamically sizes all text to fit the canvas — no ellipses, CTA always visible
 function drawShareCanvas(avg, guesses, round, width, height) {
   const canvas = document.createElement("canvas");
   const dpr = 2;
@@ -106,173 +106,234 @@ function drawShareCanvas(avg, guesses, round, width, height) {
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
 
-  const W = width;
-  const H = height;
-  const pad = Math.round(W * 0.07);
+  const W = width, H = height;
+  const pad = Math.round(W * 0.065);
   const innerW = W - pad * 2;
+  const scale = W / 1080;
+  const sp = n => Math.round(n * scale);
 
   // Background
   const grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0, "#2D2A5E");
-  grad.addColorStop(1, "#1a1840");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+  grad.addColorStop(0, "#2D2A5E"); grad.addColorStop(1, "#1a1840");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
 
-  // Subtle stripes
-  ctx.save();
-  ctx.globalAlpha = 0.05;
-  ctx.strokeStyle = "#C6FF00";
-  ctx.lineWidth = 1;
-  for (let x = -H; x < W + H; x += 28) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H, H); ctx.stroke();
-  }
+  // Stripes
+  ctx.save(); ctx.globalAlpha = 0.04; ctx.strokeStyle = "#C6FF00"; ctx.lineWidth = 1;
+  for (let x = -H; x < W+H; x += 28) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
   ctx.restore();
 
-  // Helper: rounded rect fill
-  const rr = (x, y, w, h, r, fill) => {
+  // Helpers
+  const rr = (x, y, w, h, r, fill, stroke, strokeW) => {
     ctx.beginPath();
-    ctx.moveTo(x+r, y);
-    ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
-    ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
-    ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
-    ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
     ctx.closePath();
-    ctx.fillStyle = fill; ctx.fill();
+    if (fill) { ctx.fillStyle=fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=strokeW||2; ctx.stroke(); }
   };
-  // Helper: wrapped text, returns next Y
-  const wrapText = (text, x, y, maxW, lineH) => {
-    const words = text.split(" ");
-    let line = "";
+
+  // Measure text height in lines given font and maxW
+  const measureLines = (text, maxW) => {
+    const words = text.split(" "); let line = "", lines = 0;
     for (const word of words) {
-      const test = line ? line + " " + word : word;
-      if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, x, y); y += lineH; line = word;
-      } else { line = test; }
+      const test = line ? line+" "+word : word;
+      if (ctx.measureText(test).width > maxW && line) { lines++; line=word; }
+      else line=test;
     }
-    if (line) { ctx.fillText(line, x, y); y += lineH; }
+    if (line) lines++;
+    return lines;
+  };
+  // Draw wrapped text, returns new Y
+  const drawWrapped = (text, x, y, maxW, lineH, align="left") => {
+    ctx.textAlign = align;
+    const drawX = align==="center" ? x : x;
+    const words = text.split(" "); let line = "";
+    for (const word of words) {
+      const test = line ? line+" "+word : word;
+      if (ctx.measureText(test).width > maxW && line) {
+        ctx.fillText(line, drawX, y); y+=lineH; line=word;
+      } else line=test;
+    }
+    if (line) { ctx.fillText(line, drawX, y); y+=lineH; }
+    ctx.textAlign = "left";
     return y;
   };
 
-  // Scale factors — use MORE of the canvas height by enlarging everything
-  const scale = W / 1080;
-  const fs = n => Math.round(n * scale);
-  const sp = n => Math.round(n * scale);
-
-  let y = sp(80);
-
-  // Headline — large, fills width
-  ctx.font = `${fs(100)}px Righteous, cursive`;
-  ctx.fillStyle = "#C6FF00";
-  ctx.shadowColor = "rgba(198,255,0,0.5)"; ctx.shadowBlur = sp(20);
-  ctx.textAlign = "center";
-  y = wrapText("KNOWTIENT", W/2, y, innerW, sp(72));
-  ctx.shadowBlur = 0;
-
-  // Subhead
-  ctx.font = `700 ${fs(58)}px 'Space Grotesk', sans-serif`;
-  ctx.fillStyle = "#F5F0E8";
-  y = wrapText("Guess what % of strangers know trivia answers.", W/2, y + sp(16), innerW, sp(46));
-
-  // Avg intro — "My" for share assets
-  ctx.font = `${fs(48)}px 'Space Grotesk', sans-serif`;
-  ctx.fillStyle = "#C8C3B8";
-  ctx.fillText("My average guess was off by:", W/2, y + sp(20));
-  y += sp(80); // advance past the intro line fully before drawing number
-
-  // Big avg number — baseline sits at y, so number starts cleanly below intro
-  ctx.font = `${fs(240)}px Righteous, cursive`;
-  ctx.fillStyle = "#F5A623";
-  ctx.shadowColor = "rgba(245,166,35,0.6)"; ctx.shadowBlur = sp(36);
-  ctx.fillText(`${avg.toFixed(1)}%`, W/2, y + sp(200));
-  ctx.shadowBlur = 0;
-  y += sp(220);
-
-  ctx.textAlign = "left";
-
-  // Helper: draw a highlight card
-  const drawCard = (q, g, delta, type, cardY) => {
-    const cardH = sp(340);
-    const borderCol = type === "best" ? "#3DB87A" : "#FF2D2D";
-    rr(pad, cardY, innerW, cardH, sp(16), "#363375");
-    ctx.strokeStyle = borderCol; ctx.lineWidth = sp(4);
-    ctx.beginPath();
-    const r2 = sp(16);
-    ctx.moveTo(pad+r2, cardY);
-    ctx.lineTo(pad+innerW-r2, cardY); ctx.quadraticCurveTo(pad+innerW, cardY, pad+innerW, cardY+r2);
-    ctx.lineTo(pad+innerW, cardY+cardH-r2); ctx.quadraticCurveTo(pad+innerW, cardY+cardH, pad+innerW-r2, cardY+cardH);
-    ctx.lineTo(pad+r2, cardY+cardH); ctx.quadraticCurveTo(pad, cardY+cardH, pad, cardY+cardH-r2);
-    ctx.lineTo(pad, cardY+r2); ctx.quadraticCurveTo(pad, cardY, pad+r2, cardY);
-    ctx.closePath(); ctx.stroke();
-
-    // Tag — My for share assets
-    ctx.font = `500 ${fs(30)}px 'DM Mono', monospace`;
-    ctx.fillStyle = borderCol;
-    ctx.textAlign = "left";
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", pad+sp(20), cardY+sp(38));
-
-    // Question
-    ctx.font = `700 ${fs(34)}px 'Space Grotesk', sans-serif`;
-    ctx.fillStyle = "#F5F0E8";
-    const qLines = [];
-    const qWords = q.question.split(" ");
-    let qLine = "";
-    for (const w of qWords) {
-      const test = qLine ? qLine+" "+w : w;
-      if (ctx.measureText(test).width > innerW-sp(40)) { qLines.push(qLine); qLine=w; }
-      else qLine=test;
+  // Dynamic font size: shrink until text fits in maxLines at given width
+  const fitFont = (text, baseSize, family, maxW, maxLines) => {
+    let size = Math.round(baseSize * scale);
+    while (size > sp(16)) {
+      ctx.font = `${size}px ${family}`;
+      if (measureLines(text, maxW) <= maxLines) break;
+      size -= Math.max(1, Math.round(size * 0.06));
     }
-    qLines.push(qLine);
-    const maxQLines = 2;
-    qLines.slice(0,maxQLines).forEach((l,i) => {
-      ctx.fillText(l+(i===maxQLines-1&&qLines.length>maxQLines?"…":""), pad+sp(20), cardY+sp(78)+i*sp(36));
-    });
-
-    // Answer
-    ctx.font = `${fs(30)}px 'Space Grotesk', sans-serif`;
-    ctx.fillStyle = "#C8C3B8";
-    const ans = `Correct: ${q.correct_answer}`;
-    const ansY = cardY+sp(78)+Math.min(qLines.length,maxQLines)*sp(36)+sp(8);
-    ctx.fillText(ans.length > 50 ? ans.slice(0,47)+"…" : ans, pad+sp(20), ansY);
-
-    // Numbers row
-    const numY = cardY + cardH - sp(46);
-    const numCols = [
-      { label:"Real %",    val:`${q.pct_correct}%`, color:"#F5A623" },
-      { label:"Your guess",val:`${g.guess}%`,        color:"#00F0FF" },
-      { label:"Off by",    val:`±${delta}`,           color: delta<=10?"#C6FF00":delta<=19?"#F5A623":"#FF2D2D" },
-    ];
-    numCols.forEach((nc, ci) => {
-      const nx = pad + sp(20) + ci * (innerW / 3);
-      ctx.font = `${fs(54)}px Righteous, cursive`;
-      ctx.fillStyle = nc.color;
-      ctx.fillText(nc.val, nx, numY);
-      ctx.font = `500 ${fs(26)}px 'DM Mono', monospace`;
-      ctx.fillStyle = "#C8C3B8";
-      ctx.fillText(nc.label, nx, numY+sp(28));
-    });
-
-    return cardY + cardH + sp(20);
+    return size;
   };
 
-  // Draw best and worst cards
-  if (round && round.length) {
-    const withDeltas = round.map((q, i) => ({
-      q, g: guesses[i], delta: guesses[i] ? Math.abs(guesses[i].guess - q.pct_correct) : 999,
-    }));
-    const best  = [...withDeltas].sort((a,b) => a.delta - b.delta)[0];
-    const worst = [...withDeltas].sort((a,b) => b.delta - a.delta)[0];
-    y = drawCard(best.q,  best.g,  best.delta,  "best",  y + sp(10));
-    y = drawCard(worst.q, worst.g, worst.delta, "worst", y);
-  }
+  // ── LAYOUT PLANNING ──
+  // Reserve space: header block + 2 cards + CTA. Cards are dynamic height.
+  // Strategy: measure everything first, then draw.
 
-  // CTA bar
-  const ctaH = sp(150);
-  const ctaY = Math.max(y + sp(16), H - ctaH - sp(40));
-  rr(pad, ctaY, innerW, ctaH, sp(14), "#F5A623");
-  ctx.font = `700 ${fs(46)}px Righteous, cursive`;
-  ctx.fillStyle = "#2D2A5E";
+  const withDeltas = (round && round.length)
+    ? round.map((q,i) => ({ q, g:guesses[i], delta: guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999 }))
+    : [];
+  const best  = withDeltas.length ? [...withDeltas].sort((a,b)=>a.delta-b.delta)[0] : null;
+  const worst = withDeltas.length ? [...withDeltas].sort((a,b)=>b.delta-a.delta)[0] : null;
+
+  // Fixed header heights
+  const logoSize   = sp(90);
+  const logoLineH  = sp(100);
+  const subSize    = sp(42);
+  const subLineH   = sp(52);
+  const introSize  = sp(36);
+  const numSize    = sp(170);
+  const ctaH       = sp(120);
+  const ctaMargin  = sp(24);
+  const cardPadV   = sp(20); // top/bottom padding inside card
+  const tagH       = sp(30);
+  const numRowH    = sp(80);
+  const cardGap    = sp(16);
+
+  // Measure question + answer heights dynamically for each card
+  const measureCard = (item) => {
+    if (!item) return sp(200);
+    // Question: fit in 3 lines max, shrink font
+    const qSize = fitFont(item.q.question, 32, "'Space Grotesk', sans-serif", innerW-sp(32), 3);
+    ctx.font = `700 ${qSize}px 'Space Grotesk', sans-serif`;
+    const qLines = measureLines(item.q.question, innerW-sp(32));
+    const qH = qLines * Math.round(qSize * 1.35);
+
+    const ansText = `Correct answer: ${item.q.correct_answer}`;
+    const aSize = fitFont(ansText, 26, "'Space Grotesk', sans-serif", innerW-sp(32), 3);
+    ctx.font = `${aSize}px 'Space Grotesk', sans-serif`;
+    const aLines = measureLines(ansText, innerW-sp(32));
+    const aH = aLines * Math.round(aSize * 1.35);
+
+    return cardPadV + tagH + sp(12) + qH + sp(10) + aH + sp(16) + numRowH + cardPadV;
+  };
+
+  const cardBestH  = best  ? measureCard(best)  : 0;
+  const cardWorstH = worst ? measureCard(worst) : 0;
+
+  // Total fixed content height (header + cards + CTA)
+  const headerH = sp(70) + logoLineH + sp(16)
+    + subLineH * measureLines("What % of Americans answered questions correctly?", innerW) + sp(16)
+    + introSize + sp(16)
+    + numSize + sp(20);
+  const totalContent = headerH + cardBestH + cardGap + cardWorstH + ctaMargin + ctaH + sp(40);
+
+  // If content > canvas height, we need to scale everything down proportionally
+  const globalScale = totalContent > H ? (H / totalContent) : 1.0;
+  const gs = n => Math.round(n * globalScale);
+
+  // ── DRAW ──
+  let y = gs(sp(56));
+
+  // KNOWTIENT logo
+  ctx.font = `${gs(logoSize)}px Righteous, cursive`;
+  ctx.fillStyle = "#C6FF00";
+  ctx.shadowColor = "rgba(198,255,0,0.5)"; ctx.shadowBlur = gs(sp(18));
   ctx.textAlign = "center";
-  ctx.fillText("Can you beat it?  Knowtient.game", W/2, ctaY + ctaH*0.62);
+  const ktKnowW = ctx.measureText("KNOW").width;
+  const ktTientW = ctx.measureText("TIENT").width;
+  const ktGap = gs(sp(5));
+  const ktTotalW = ktKnowW + ktGap + ktTientW;
+  const ktStartX = W/2 - ktTotalW/2;
+  ctx.fillText("KNOW",  ktStartX + ktKnowW/2,            y + gs(logoSize) + gs(sp(8)));
+  ctx.fillText("TIENT", ktStartX + ktKnowW + ktGap + ktTientW/2, y + gs(logoSize));
+  ctx.shadowBlur = 0;
+  y += gs(logoLineH);
+
+  // Subhead
+  ctx.textAlign = "center";
+  const subFS = gs(subSize);
+  ctx.font = `700 ${subFS}px 'Space Grotesk', sans-serif`;
+  ctx.fillStyle = "#F5F0E8";
+  y = drawWrapped("What % of Americans answered questions correctly?", W/2, y + gs(sp(14)), innerW, gs(subLineH), "center");
+
+  // Avg intro
+  const introFS = gs(introSize);
+  ctx.font = `${introFS}px 'Space Grotesk', sans-serif`;
+  ctx.fillStyle = "#C8C3B8";
+  ctx.textAlign = "center";
+  ctx.fillText("My average guess was off by:", W/2, y + gs(sp(14)));
+  y += gs(sp(14)) + gs(introFS) + gs(sp(12));
+
+  // Big number
+  const bigNumFS = gs(numSize);
+  ctx.font = `${bigNumFS}px Righteous, cursive`;
+  ctx.fillStyle = "#F5A623";
+  ctx.shadowColor = "rgba(245,166,35,0.6)"; ctx.shadowBlur = gs(sp(28));
+  ctx.textAlign = "center";
+  ctx.fillText(`${avg.toFixed(1)}%`, W/2, y + gs(numSize));
+  ctx.shadowBlur = 0;
+  y += gs(numSize) + gs(sp(20));
+  ctx.textAlign = "left";
+
+  // ── DRAW CARD ──
+  const drawCard = (item, type, cardY, cardH) => {
+    const borderCol = type==="best" ? "#3DB87A" : "#FF2D2D";
+    rr(pad, cardY, innerW, cardH, gs(sp(14)), "#363375", borderCol, gs(sp(3)));
+
+    let cy = cardY + gs(cardPadV);
+
+    // Tag
+    ctx.font = `700 ${gs(sp(24))}px 'DM Mono', monospace`;
+    ctx.fillStyle = borderCol;
+    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", pad+gs(sp(18)), cy+gs(tagH));
+    cy += gs(tagH) + gs(sp(12));
+
+    // Question — fit font to 3 lines
+    const qSize = fitFont(item.q.question, 32, "'Space Grotesk', sans-serif", innerW-gs(sp(32)), 3);
+    ctx.font = `700 ${qSize}px 'Space Grotesk', sans-serif`;
+    ctx.fillStyle = "#F5F0E8";
+    cy = drawWrapped(item.q.question, pad+gs(sp(18)), cy, innerW-gs(sp(32)), Math.round(qSize*1.4));
+    cy += gs(sp(8));
+
+    // Answer — fit font to 3 lines, no truncation
+    const ansText = `Correct answer: ${item.q.correct_answer}`;
+    const aSize = fitFont(ansText, 26, "'Space Grotesk', sans-serif", innerW-gs(sp(32)), 3);
+    ctx.font = `${aSize}px 'Space Grotesk', sans-serif`;
+    ctx.fillStyle = "#C8C3B8";
+    cy = drawWrapped(ansText, pad+gs(sp(18)), cy, innerW-gs(sp(32)), Math.round(aSize*1.4));
+    cy += gs(sp(12));
+
+    // Numbers row
+    const numCols = [
+      { label:"Real %",    val:`${item.q.pct_correct}%`, color:"#F5A623" },
+      { label:"Your guess",val:`${item.g.guess}%`,        color:"#00F0FF" },
+      { label:"Off by",    val:`±${item.delta}`, color: item.delta<=10?"#C6FF00":item.delta<=19?"#F5A623":"#FF2D2D" },
+    ];
+    const colW = innerW / 3;
+    numCols.forEach((nc, ci) => {
+      const nx = pad + gs(sp(10)) + ci * colW;
+      ctx.font = `${gs(sp(46))}px Righteous, cursive`; ctx.fillStyle = nc.color;
+      ctx.fillText(nc.val, nx, cy + gs(sp(44)));
+      ctx.font = `500 ${gs(sp(22))}px 'DM Mono', monospace`; ctx.fillStyle = "#C8C3B8";
+      ctx.fillText(nc.label, nx, cy + gs(sp(44)) + gs(sp(24)));
+    });
+  };
+
+  // Draw both cards
+  if (best)  drawCard(best,  "best",  y,                    gs(cardBestH));
+  if (worst) drawCard(worst, "worst", y + gs(cardBestH) + gs(cardGap), gs(cardWorstH));
+  y += gs(cardBestH) + gs(cardGap) + gs(cardWorstH);
+
+  // CTA — always at bottom, expand to fill remaining space
+  const ctaActualH = Math.max(gs(ctaH), H - y - gs(sp(32)));
+  const ctaY = y + gs(sp(16));
+  rr(pad, ctaY, innerW, ctaActualH, gs(sp(12)), "#F5A623");
+  ctx.textAlign = "center";
+  // Two lines in CTA
+  const ctaSize1 = gs(sp(36));
+  const ctaSize2 = gs(sp(44));
+  ctx.font = `700 ${ctaSize1}px 'Space Grotesk', sans-serif`;
+  ctx.fillStyle = "#2D2A5E";
+  ctx.fillText("Can you beat it?", W/2, ctaY + ctaActualH*0.38);
+  ctx.font = `700 ${ctaSize2}px Righteous, cursive`;
+  ctx.fillText("Knowtient.game", W/2, ctaY + ctaActualH*0.72);
   ctx.textAlign = "left";
 
   return canvas.toDataURL("image/png");
@@ -495,7 +556,7 @@ const GlobalStyles = () => (
     @keyframes fadeIn { from{opacity:0} to{opacity:1} }
     .share-card { background:var(--color-surface); border:2px solid var(--color-border); border-radius:16px; padding:24px 20px; width:100%; max-width:390px; max-height:90dvh; overflow-y:auto; scrollbar-width:none; }
     .share-card::-webkit-scrollbar { display:none; }
-    .share-card-headline { font-family:'Righteous',cursive; font-size:22px; color:#C6FF00; letter-spacing:0.04em; margin-bottom:4px; text-shadow:0 0 12px rgba(198,255,0,0.35); line-height:1.2; }
+    .share-card-headline { font-family:'Righteous',cursive; font-size:22px; color:#C6FF00; letter-spacing:0.04em; margin-bottom:4px; text-shadow:0 0 12px rgba(198,255,0,0.35); line-height:1.2; display:inline-flex; align-items:baseline; gap:3px; }
     .share-card-subhead  { font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; color:var(--color-text); margin-bottom:4px; }
     .share-card-avg-line { font-family:'Space Grotesk',sans-serif; font-size:15px; color:var(--color-secondary); margin-bottom:2px; }
     .share-score-row  { display:flex; align-items:baseline; gap:6px; margin-bottom:10px; }
@@ -535,11 +596,22 @@ const GlobalStyles = () => (
     .splash-rule-text strong { color:var(--color-amber); font-weight:700; }
     .splash-bottom { padding-bottom:40px; display:flex; flex-direction:column; gap:10px; }
     .splash-bottom .btn-primary { font-size:22px; min-height:62px; }
-    .splash-source-note { font-family:'DM Mono',monospace; font-size:12px; font-weight:500; color:var(--color-secondary); text-align:center; }
+    .splash-source-note { display:none; }
+    .btn-about { background:transparent; border:none; color:var(--color-secondary); font-family:'DM Mono',monospace; font-size:14px; font-weight:500; text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:8px; -webkit-tap-highlight-color:transparent; letter-spacing:0.04em; }
+    .btn-about:hover { color:var(--color-text); }
+    /* About lightbox */
+    .about-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.78); z-index:400; display:flex; align-items:center; justify-content:center; padding:24px; animation:fadeIn 0.2s ease; }
+    .about-box { background:var(--color-surface); border:2px solid var(--color-border); border-radius:18px; padding:32px 28px; width:100%; max-width:420px; position:relative; }
+    .about-close { position:absolute; top:16px; right:18px; background:transparent; border:none; color:var(--color-secondary); font-size:22px; cursor:pointer; line-height:1; padding:4px 8px; }
+    .about-close:hover { color:var(--color-text); }
+    .about-title { font-family:'Righteous',cursive; font-size:22px; color:#C6FF00; letter-spacing:0.04em; margin-bottom:16px; text-shadow:0 0 12px rgba(198,255,0,0.3); }
+    .about-body { font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:400; color:var(--color-text); line-height:1.65; }
 
     /* TITLE BAR — hidden on end screen */
     .app-title-bar { display:flex; align-items:center; justify-content:center; padding:10px 18px 4px; flex-shrink:0; }
-    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); }
+    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); display:inline-flex; align-items:baseline; gap:3px; }
+    .kt-know  { position:relative; top:5px; }
+    .kt-tient { position:relative; top:0; }
 
     /* ══ TITLE SCREEN ══ */
     .title-screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 28px 56px; overflow:hidden; cursor:pointer; background:var(--color-base); }
@@ -548,11 +620,14 @@ const GlobalStyles = () => (
     .title-content { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:380px; }
     /* Dictionary title */
     .dict-title-wrap { width:100%; }
-    /* KNOWTIENT title — KNOW slides from left, RATE slides from right */
+    /* KNOWTIENT title — KNOW slides from left, TIENT slides from right */
     .dict-title-wrap { display:flex; align-items:baseline; gap:0; justify-content:center; width:100%; }
     .dict-chunk { display:inline-block; font-family:'Righteous',cursive; font-size:72px; color:#C6FF00; text-shadow:2px 3px 0 #1a7a50,0 0 22px rgba(198,255,0,0.75); opacity:0; }
     .dict-chunk.know { transform:translateX(-120px) scale(0.85); }
     .dict-chunk.rate { transform:translateX(120px) scale(0.85); }
+    /* Logo: KNOW sits lower than TIENT, small gap between halves */
+    .dict-chunk.know.landed, .dict-chunk.know.dance { position:relative; top:10px; margin-right:6px; }
+    .dict-chunk.rate.landed, .dict-chunk.rate.dance { position:relative; top:0px; }
     .dict-chunk.fly-in { animation:chunkFlyIn 0.55s cubic-bezier(0.22,1.4,0.36,1) forwards; }
     @keyframes chunkFlyIn { 0%{opacity:0} 100%{opacity:1;transform:translateX(0) scale(1)} }
     /* landed: explicit resting state so browser never reverts to opacity:0 */
@@ -587,6 +662,10 @@ const GlobalStyles = () => (
 );
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+// IDs of questions to limit to 1 per round
+const BIBLE_IDS    = new Set(['pew_religion_2019_001','pew_religion_2019_002','pew_religion_2019_012','pew_religion_2019_025']);
+const REGIONAL_RELIGION_IDS = new Set(['pew_intl_2022_003']);
+
 function buildRound(allQuestions) {
   const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
   const unflagged = allQuestions.filter(q => !q.flagged && !q.image_dependent);
@@ -635,7 +714,29 @@ function buildRound(allQuestions) {
       .slice(0, 7 - round.length).forEach(q => round.push(q));
   }
 
-  const result = shuffle(round);
+  const round_shuffled = shuffle(round);
+
+  // Enforce: max 1 Bible question, max 1 regional-religion question per round
+  const ensureMax1 = (ids, arr) => {
+    const matches = arr.filter(q => ids.has(q.id));
+    if (matches.length <= 1) return arr;
+    // Keep the first match, replace the rest with non-matching questions
+    let kept = false;
+    return arr.map(q => {
+      if (!ids.has(q.id)) return q;
+      if (!kept) { kept = true; return q; }
+      // Find a replacement that's not already in the round and not in the banned set
+      const roundIds = new Set(arr.map(r => r.id));
+      const replacement = shuffle(available.filter(r =>
+        !roundIds.has(r.id) && !ids.has(r.id) && r.category !== 'civics'
+      ))[0];
+      return replacement || q; // fallback: keep original if no replacement
+    });
+  };
+
+  let result = round_shuffled;
+  result = ensureMax1(BIBLE_IDS, result);
+  result = ensureMax1(REGIONAL_RELIGION_IDS, result);
   result.forEach(q => seenIds.add(q.id));
   return result;
 }
@@ -788,26 +889,45 @@ function TitleScreen({ onBegin }) {
   );
 }
 
-// ─── SPLASH ───────────────────────────────────────────────────────────────────
-function SplashScreen({ onStart }) {
+// ─── ABOUT LIGHTBOX ───────────────────────────────────────────────────────────
+function AboutLightbox({ onClose }) {
   return (
-    <div className="screen screen-enter-from-left">
-      <div className="splash">
-        <div className="splash-top">
-          <div className="splash-rules">
-            <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text"><strong>7 trivia questions</strong> pulled from real Pew Research survey data across the USA. The 'correct' answer doesn't matter.</span></div>
-            <div className="splash-rule-divider" />
-            <div className="splash-rule"><div className="splash-rule-icon">🎚️</div><span className="splash-rule-text"><strong>The real question:</strong> what % of Americans got that trivia right? Drag the slider to your guess.</span></div>
-            <div className="splash-rule-divider" />
-            <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text">The <strong>correct % is revealed.</strong><br/><strong>How close can you get?</strong></span></div>
-          </div>
-        </div>
-        <div className="splash-bottom">
-          <button className="btn-primary" onClick={onStart}>START ROUND →</button>
-          <div className="splash-source-note">Data: Pew Research Center nationally representative surveys</div>
+    <div className="about-overlay" onClick={onClose}>
+      <div className="about-box" onClick={e => e.stopPropagation()}>
+        <button className="about-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="about-title">About This Game</div>
+        <div className="about-body">
+          All questions (and corresponding percentages of correct responses) are drawn from nationally representative surveys of U.S. adults, conducted by Pew Research Center using probability-based sampling. Sample sizes range from 3,278 to 10,971. All surveys were weighted to U.S. Census benchmarks.
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── SPLASH ───────────────────────────────────────────────────────────────────
+function SplashScreen({ onStart }) {
+  const [showAbout, setShowAbout] = useState(false);
+  return (
+    <>
+      <div className="screen screen-enter-from-left">
+        <div className="splash">
+          <div className="splash-top">
+            <div className="splash-rules">
+              <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">You will see <strong>seven real questions</strong> pulled from Pew Research surveys across the USA (incl. what year the data was gathered). The 'correct' answer doesn't matter.</span></div>
+              <div className="splash-rule-divider" />
+              <div className="splash-rule"><div className="splash-rule-icon">🎚️</div><span className="splash-rule-text"><strong>The real question:</strong> what % of Americans answered that question correctly? Drag the slider to your guess.</span></div>
+              <div className="splash-rule-divider" />
+              <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text">The real % of correct answers is revealed.<br/><strong>How close can you get?</strong></span></div>
+            </div>
+          </div>
+          <div className="splash-bottom">
+            <button className="btn-primary" onClick={onStart}>START ROUND →</button>
+            <button className="btn-about" onClick={() => setShowAbout(true)}>ABOUT THIS GAME</button>
+          </div>
+        </div>
+      </div>
+      {showAbout && <AboutLightbox onClose={() => setShowAbout(false)} />}
+    </>
   );
 }
 
@@ -1079,7 +1199,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare }) {
       <div className="screen screen-enter">
         <div className="end-screen">
           <div className="end-content">
-            <div className="end-headline">KNOWTIENT:</div>
+            <div className="end-headline"><span className="kt-know">KNOW</span><span className="kt-tient">TIENT:</span></div>
             <div className="end-avg-intro">Your average guess was off by:</div>
             <div className="end-avg-number-wrap">
               <BigNumber
@@ -1168,7 +1288,7 @@ function ShareCard({ guesses, round, onClose }) {
           /* ── MOBILE ── */
           <>
             <div className="share-card-headline">What is your Knowtient?</div>
-            <div className="share-card-subhead">Guess what % of strangers know trivia answers.</div>
+            <div className="share-card-subhead">What % of Americans answered questions correctly?</div>
             <div className="share-card-avg-line">My average guess was off by:</div>
             <div className="share-score-row">
               <span className="share-score-num">{avg.toFixed(1)}</span>
@@ -1287,7 +1407,7 @@ export default function App() {
       <div className="app-shell">
         {showTitleBar && (
           <div className="app-title-bar">
-            <span className="app-title-bar-text">KNOWTIENT</span>
+            <span className="app-title-bar-text"><span className="kt-know">KNOW</span><span className="kt-tient">TIENT</span></span>
           </div>
         )}
         <ProgressBar current={qIndex} total={TOTAL} show={showProgress} />
