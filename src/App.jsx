@@ -203,7 +203,7 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     if (!item) return 0;
     const cardIW = IW - px(36);
     // Tag
-    const tagH = px(48);
+    const tagH = px(50);
     // Question: fit to 4 lines max
     const qSz  = fitFont(item.q.question, px(36), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
     ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
@@ -281,8 +281,8 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     // Tag
     ctx.font = `700 ${g(px(26))}px 'DM Mono',monospace`;
     ctx.fillStyle = bc;
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(30)));
-    cy += g(px(30)) + g(px(18));
+    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(28)));
+    cy += g(px(28)) + g(px(22));
 
     // Question — dynamic font, full text, up to 4 lines
     const qSz = fitFont(item.q.question, g(px(36)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
@@ -462,7 +462,7 @@ const GlobalStyles = () => (
     .reveal-screen { display:flex; flex-direction:column; min-height:100%; }
     .reveal-top-label { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); text-align:center; margin-bottom:8px; margin-top:4px; }
     .reveal-big-number-wrap { display:flex; justify-content:center; margin-bottom:4px; }
-    .reveal-bar-section { margin-bottom:0; }
+    .reveal-bar-section { margin-bottom:0; min-height:110px; }
     .reveal-bar-track { position:relative; height:12px; background:var(--color-border); border-radius:6px; }
     .reveal-bar-fill { height:100%; border-radius:6px; transition:width 1.4s cubic-bezier(0.34,1.4,0.64,1); }
     .reveal-bar-fill::after { content:''; position:absolute; top:0; left:-60%; width:60%; height:100%; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.5) 50%,transparent 100%); border-radius:6px; opacity:0; }
@@ -476,7 +476,7 @@ const GlobalStyles = () => (
     .reveal-delta-number.green { color:var(--color-neon-lime); text-shadow:0 0 12px rgba(198,255,0,0.5); }
     .reveal-delta-number.amber { color:var(--color-amber); text-shadow:0 0 12px rgba(245,166,35,0.4); }
     .reveal-delta-number.red   { color:var(--color-red); text-shadow:0 0 14px rgba(255,45,45,0.6); }
-    .reveal-voice-label { font-family:'Righteous',cursive; font-size:26px; text-align:center; margin-bottom:20px; }
+    .reveal-voice-label { font-family:'Righteous',cursive; font-size:26px; text-align:center; margin-bottom:20px; min-height:38px; }
     .reveal-voice-label.green { color:var(--color-neon-lime); text-shadow:0 0 16px rgba(198,255,0,0.6); }
     .reveal-voice-label.amber { color:var(--color-amber); text-shadow:0 0 16px rgba(245,166,35,0.5); }
     .reveal-voice-label.red   { color:var(--color-red); text-shadow:0 0 18px rgba(255,45,45,0.7); }
@@ -486,7 +486,7 @@ const GlobalStyles = () => (
     .reveal-answer-card-label { font-family:'DM Mono',monospace; font-size:16px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-secondary); margin-bottom:7px; }
     .reveal-answer-card-text  { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:500; color:var(--color-text); }
     .reveal-bar-reality-label { display:none; }
-    .reveal-bottom { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
+    .reveal-bottom { margin-top:16px; display:flex; flex-direction:column; gap:10px; }
     .reveal-tap-hint { font-family:'DM Mono',monospace; font-size:13px; color:var(--color-secondary); text-align:center; opacity:0.55; }
     .flash-overlay { position:fixed; inset:0; opacity:0; pointer-events:none; z-index:100; }
     .flash-overlay.active      { background:var(--color-red);       animation:flashPulse 0.45s ease-out forwards; }
@@ -896,7 +896,7 @@ function AboutLightbox({ onClose }) {
     <div className="about-overlay" onClick={onClose}>
       <div className="about-box" onClick={e => e.stopPropagation()}>
         <button className="about-close" onClick={onClose} aria-label="Close">✕</button>
-        <div className="about-title">About This Game</div>
+        <div className="about-title">About the Data</div>
         <div className="about-body">
           All questions (and corresponding percentages of correct responses) are drawn from nationally representative surveys of U.S. adults, conducted by Pew Research Center using probability-based sampling. Sample sizes range from 3,278 to 10,971. All surveys were weighted to U.S. Census benchmarks.
         </div>
@@ -921,7 +921,7 @@ function SplashScreen({ onStart }) {
             </div>
           </div>
           <div className="splash-bottom">
-            <button className="btn-primary" onClick={onStart}>START ROUND →</button>
+            <button className="btn-primary" onClick={onStart}>START ROUND</button>
             <button className="btn-about" onClick={() => setShowAbout(true)}>ABOUT THE DATA</button>
           </div>
         </div>
@@ -934,7 +934,7 @@ function SplashScreen({ onStart }) {
 // ─── QUESTION SCREEN ──────────────────────────────────────────────────────────
 function QuestionScreen({ question, onSubmit, animClass }) {
   const [value, setValue]           = useState(50);
-  const [moved, setMoved]           = useState(true);  // submit enabled immediately
+  const [moved, setMoved]           = useState(false); // tracks whether user has touched slider
   const [visibleChoices, setVisibleChoices] = useState(0);
   const lastTickRef = useRef(50);
   const shuffledChoices = useRef([]);
@@ -964,6 +964,7 @@ shuffledChoices.current = moveToEnd(shuffled);
   const handleChange = (e) => {
     const v = parseInt(e.target.value, 10);
     setValue(v);
+    if (!moved) setMoved(true);
     if (Math.abs(v - lastTickRef.current) >= 1) { playTick(v); lastTickRef.current = v; }
   };
   const handleRelease = () => { if (moved) playSelect(value); };
@@ -1086,7 +1087,7 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
           ) : (
             <>
               <div className="reveal-delta-row" style={{visibility:"hidden"}}><div className="reveal-delta-number">—</div></div>
-              <div className="reveal-voice-label" style={{visibility:"hidden"}}>—</div>
+              <div className="reveal-voice-label" style={{visibility:"hidden",minHeight:"38px"}}>—</div>
             </>
           )}
           <div className="reveal-question-recap">
