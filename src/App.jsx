@@ -424,18 +424,18 @@ const GlobalStyles = () => (
 
     /* QUESTION SCREEN */
     .question-screen { display:flex; flex-direction:column; min-height:100%; overflow-y:visible; }
-    .q-meta-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; margin-top:2px; flex-shrink:0; }
+    .q-meta-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; margin-top:2px; flex-shrink:0; }
     .q-category-pill { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; color:var(--color-secondary); text-transform:uppercase; letter-spacing:0.06em; }
     .q-source-dot { width:4px; height:4px; border-radius:50%; background:var(--color-border); flex-shrink:0; }
     .q-source-label { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; color:var(--color-secondary); }
-    .q-text { font-family:'Space Grotesk',sans-serif; font-size:23px; font-weight:700; line-height:1.35; color:var(--color-text); margin-bottom:12px; flex-shrink:0; }
-    .slider-section { flex-shrink:0; background:rgba(255,255,255,0.06); border:2px solid rgba(245,166,35,0.35); border-radius:14px; padding:12px 14px 10px; margin-bottom:12px; }
-    .slider-prompt-label { font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:var(--color-text); margin-bottom:6px; text-align:center; }
-    .slider-live-number { font-family:'DM Mono',monospace; font-size:52px; font-weight:500; text-align:center; transition:color 0.15s; min-height:58px; display:flex; align-items:center; justify-content:center; line-height:1; }
+    .q-text { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; line-height:1.3; color:var(--color-text); margin-bottom:8px; flex-shrink:0; }
+    .slider-section { flex-shrink:0; background:rgba(255,255,255,0.06); border:2px solid rgba(245,166,35,0.35); border-radius:14px; padding:8px 12px 8px; margin-bottom:8px; }
+    .slider-prompt-label { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:var(--color-text); margin-bottom:4px; text-align:center; }
+    .slider-live-number { font-family:'DM Mono',monospace; font-size:40px; font-weight:500; text-align:center; transition:color 0.15s; min-height:46px; display:flex; align-items:center; justify-content:center; line-height:1; }
     .slider-live-number.active   { color:var(--color-amber); }
     .slider-live-number.inactive { color:var(--color-border); }
-    .slider-live-pct { font-size:26px; }
-    .slider-drag-hint { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; text-align:center; color:var(--color-secondary); height:20px; margin-bottom:6px; transition:opacity 0.25s; }
+    .slider-live-pct { font-size:20px; }
+    .slider-drag-hint { font-family:'DM Mono',monospace; font-size:14px; font-weight:500; text-align:center; color:var(--color-secondary); height:16px; margin-bottom:4px; transition:opacity 0.25s; }
     .slider-drag-hint.hidden { opacity:0; }
     .slider-wrap { position:relative; padding:14px 0; margin-bottom:2px; cursor:pointer; }
     .slider-track-bg   { position:absolute; top:50%; left:0; right:0; height:8px; transform:translateY(-50%); background:var(--color-border); border-radius:4px; pointer-events:none; z-index:0; }
@@ -449,13 +449,13 @@ const GlobalStyles = () => (
     .answer-choices-wrap { overflow-y:visible; overflow-x:hidden; }
     .answer-choices-wrap::-webkit-scrollbar { display:none; }
     /* Question screen scrolls as a whole on mobile — no inner scroll container */
-    .answer-choices-label { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); opacity:0.7; margin-bottom:9px; }
-    .answer-choices { display:flex; flex-direction:column; gap:8px; padding-bottom:16px; }
-    .answer-choice { display:flex; align-items:flex-start; gap:12px; background:rgba(54,51,117,0.5); border:1.5px solid rgba(78,74,138,0.5); border-radius:8px; padding:12px 14px; opacity:0; transform:translateY(14px) scale(0.97); pointer-events:none; cursor:default; user-select:none; }
+    .answer-choices-label { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); opacity:0.7; margin-bottom:6px; }
+    .answer-choices { display:flex; flex-direction:column; gap:5px; padding-bottom:12px; }
+    .answer-choice { display:flex; align-items:flex-start; gap:10px; background:rgba(54,51,117,0.5); border:1.5px solid rgba(78,74,138,0.5); border-radius:8px; padding:8px 10px; opacity:0; transform:translateY(10px) scale(0.97); pointer-events:none; cursor:default; user-select:none; }
     .answer-choice.animate-in { animation:choiceBounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
     @keyframes choiceBounceIn { from{opacity:0;transform:translateY(14px) scale(0.97)} to{opacity:0.7;transform:translateY(0) scale(1)} }
     .answer-choice-letter { font-family:'DM Mono',monospace; font-size:16px; font-weight:500; color:var(--color-secondary); flex-shrink:0; padding-top:1px; min-width:20px; }
-    .answer-choice-text   { font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:400; color:var(--color-secondary); line-height:1.4; }
+    .answer-choice-text   { font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:400; color:var(--color-secondary); line-height:1.35; }
 
     /* REVEAL */
     .reveal-screen { display:flex; flex-direction:column; min-height:100%; }
@@ -597,7 +597,7 @@ const GlobalStyles = () => (
     .splash-bottom { padding-bottom:40px; display:flex; flex-direction:column; gap:10px; }
     .splash-bottom .btn-primary { font-size:22px; min-height:62px; }
     .splash-source-note { display:none; }
-    .btn-about { background:transparent; border:none; color:var(--color-secondary); font-family:'DM Mono',monospace; font-size:14px; font-weight:500; text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:8px; -webkit-tap-highlight-color:transparent; letter-spacing:0.04em; }
+    .btn-about { background:transparent; border:none; color:var(--color-secondary); font-family:'DM Mono',monospace; font-size:17px; font-weight:700; text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:10px; -webkit-tap-highlight-color:transparent; letter-spacing:0.04em; }
     .btn-about:hover { color:var(--color-text); }
     /* About lightbox */
     .about-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.78); z-index:400; display:flex; align-items:center; justify-content:center; padding:24px; animation:fadeIn 0.2s ease; }
@@ -913,9 +913,9 @@ function SplashScreen({ onStart }) {
         <div className="splash">
           <div className="splash-top">
             <div className="splash-rules">
-              <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">You will see <strong>seven real questions</strong> pulled from Pew Research surveys across the USA (incl. what year the data was gathered). The 'correct' answer doesn't matter.</span></div>
+              <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">You will see <strong>seven real questions</strong> that Pew Research already asked thousands of Americans.</span></div>
               <div className="splash-rule-divider" />
-              <div className="splash-rule"><div className="splash-rule-icon">🎚️</div><span className="splash-rule-text"><strong>The real question:</strong> what % of Americans answered that question correctly? Drag the slider to your guess.</span></div>
+              <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text"><strong>Your challenge:</strong> guess what % of Americans answered that question correctly.</span></div>
               <div className="splash-rule-divider" />
               <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text">The real % of correct answers is revealed.<br/><strong>How close can you get?</strong></span></div>
             </div>
@@ -934,7 +934,7 @@ function SplashScreen({ onStart }) {
 // ─── QUESTION SCREEN ──────────────────────────────────────────────────────────
 function QuestionScreen({ question, onSubmit, animClass }) {
   const [value, setValue]           = useState(50);
-  const [moved, setMoved]           = useState(false);
+  const [moved, setMoved]           = useState(true);  // submit enabled immediately
   const [visibleChoices, setVisibleChoices] = useState(0);
   const lastTickRef = useRef(50);
   const shuffledChoices = useRef([]);
@@ -948,7 +948,14 @@ const correctAnswer = shuffled[0];
 shuffled.splice(0, 1); // remove from front
 const insertAt = Math.floor(Math.random() * (shuffled.length + 1));
 shuffled.splice(insertAt, 0, correctAnswer);
-shuffledChoices.current = shuffled;
+// Move 'All of the above' / 'None of the above' variants to end
+const moveToEnd = (arr) => {
+  const pattern = /all of the above|none of the above/i;
+  const bottom = arr.filter(c => pattern.test(c));
+  const rest   = arr.filter(c => !pattern.test(c));
+  return [...rest, ...bottom];
+};
+shuffledChoices.current = moveToEnd(shuffled);
     const n = choices.length;
     const timers = choices.map((_,i) => setTimeout(() => setVisibleChoices(v => Math.max(v,i+1)), i*(500/n)));
     return () => timers.forEach(clearTimeout);
@@ -957,7 +964,6 @@ shuffledChoices.current = shuffled;
   const handleChange = (e) => {
     const v = parseInt(e.target.value, 10);
     setValue(v);
-    if (!moved) setMoved(true);
     if (Math.abs(v - lastTickRef.current) >= 1) { playTick(v); lastTickRef.current = v; }
   };
   const handleRelease = () => { if (moved) playSelect(value); };
@@ -990,7 +996,7 @@ shuffledChoices.current = shuffled;
             <input type="range" className="slider-input" min={0} max={100} step={1} value={value}
               onChange={handleChange} onMouseUp={handleRelease} onTouchEnd={handleRelease} />
           </div>
-          <button className="btn-primary" onClick={() => { playSelect(value); onSubmit(value); }} disabled={!moved}>
+          <button className="btn-primary" onClick={() => { playSelect(value); onSubmit(value); }}>
             SUBMIT →
           </button>
         </div>
@@ -1072,10 +1078,8 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
           </div>
           {showDelta ? (
             <>
-              <div className="reveal-delta-row delta-bounce">
-                <div className={`reveal-delta-number ${cls}`}>
-                  {delta===0?"off by 0 pts":`off by ${delta} ${delta===1?"pt":"pts"}`}
-                </div>
+              <div className="reveal-delta-row delta-bounce" style={{display:"none"}}>
+                <div className={`reveal-delta-number ${cls}`}></div>
               </div>
               <div className={`reveal-voice-label delta-bounce ${cls}`} style={{animationDelay:"60ms"}}>{voiceLabel(delta)}</div>
             </>
@@ -1386,12 +1390,13 @@ export default function App() {
 
   const handlePlayAgain = useCallback(() => {
     // Reset audio context so it works fresh on next round (mobile suspension fix)
-    try {
-      if (audioCtx) { audioCtx.close(); }
-    } catch {}
+    try { if (audioCtx) { audioCtx.close(); } } catch {}
     audioCtx = null;
-    setScreen("title");
-  }, []);
+    // Skip title — go straight to first question of new round
+    const r = buildRound(questions);
+    setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
+    setShowShare(false); setScreen("question"); setQAnim("screen-enter");
+  }, [questions]);
 
   const handleSubmit = (guess) => {
     setLastGuess(guess); setQAnim("screen-exit");
