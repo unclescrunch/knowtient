@@ -99,7 +99,8 @@ function playEndChime() {
 }
 
 // ─── SHARE IMAGE GENERATOR ────────────────────────────────────────────────────
-// Dynamically sizes all text to fit the canvas — no ellipses, CTA always visible
+// Two-pass layout: measure all content heights first, then scale to fit, then draw.
+// No ellipses. CTA always visible. Works at any aspect ratio.
 function drawShareCanvas(avg, guesses, round, width, height) {
   const canvas = document.createElement("canvas");
   const dpr = 2;
@@ -109,23 +110,19 @@ function drawShareCanvas(avg, guesses, round, width, height) {
   ctx.scale(dpr, dpr);
 
   const W = width, H = height;
-  const pad = Math.round(W * 0.065);
-  const innerW = W - pad * 2;
-  const scale = W / 1080;
-  const sp = n => Math.round(n * scale);
+  const PAD = Math.round(W * 0.065);
+  const IW  = W - PAD * 2; // inner width
 
   // Background
   const grad = ctx.createLinearGradient(0, 0, W, H);
   grad.addColorStop(0, "#2D2A5E"); grad.addColorStop(1, "#1a1840");
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
-  // Stripes
   ctx.save(); ctx.globalAlpha = 0.04; ctx.strokeStyle = "#C6FF00"; ctx.lineWidth = 1;
   for (let x = -H; x < W+H; x += 28) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
   ctx.restore();
 
-  // Helpers
-  const rr = (x, y, w, h, r, fill, stroke, strokeW) => {
+  // ── Helpers ──
+  const rr = (x, y, w, h, r, fill, strokeCol, strokeW) => {
     ctx.beginPath();
     ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
     ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
@@ -133,209 +130,209 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
     ctx.closePath();
     if (fill) { ctx.fillStyle=fill; ctx.fill(); }
-    if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=strokeW||2; ctx.stroke(); }
+    if (strokeCol) { ctx.strokeStyle=strokeCol; ctx.lineWidth=strokeW||2; ctx.stroke(); }
   };
 
-  // Measure text height in lines given font and maxW
-  const measureLines = (text, maxW) => {
-    const words = text.split(" "); let line = "", lines = 0;
-    for (const word of words) {
-      const test = line ? line+" "+word : word;
-      if (ctx.measureText(test).width > maxW && line) { lines++; line=word; }
-      else line=test;
+  // Count how many lines text needs at given font+maxW
+  const countLines = (text, maxW) => {
+    const words = text.split(" "); let line="", n=0;
+    for (const w of words) {
+      const t = line ? line+" "+w : w;
+      if (ctx.measureText(t).width > maxW && line) { n++; line=w; } else line=t;
     }
-    if (line) lines++;
-    return lines;
+    return n + (line ? 1 : 0);
   };
-  // Draw wrapped text, returns new Y
-  const drawWrapped = (text, x, y, maxW, lineH, align="left") => {
-    ctx.textAlign = align;
-    const drawX = align==="center" ? x : x;
-    const words = text.split(" "); let line = "";
-    for (const word of words) {
-      const test = line ? line+" "+word : word;
-      if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, drawX, y); y+=lineH; line=word;
-      } else line=test;
+
+  // Draw wrapped text left-aligned, return new Y
+  const drawW = (text, x, y, maxW, lineH) => {
+    const words = text.split(" "); let line="";
+    for (const w of words) {
+      const t = line ? line+" "+w : w;
+      if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line,x,y); y+=lineH; line=w; } else line=t;
     }
-    if (line) { ctx.fillText(line, drawX, y); y+=lineH; }
-    ctx.textAlign = "left";
+    if (line) { ctx.fillText(line,x,y); y+=lineH; }
     return y;
   };
 
-  // Dynamic font size: shrink until text fits in maxLines at given width
-  const fitFont = (text, baseSize, family, maxW, maxLines) => {
-    let size = Math.round(baseSize * scale);
-    while (size > sp(16)) {
-      ctx.font = `${size}px ${family}`;
-      if (measureLines(text, maxW) <= maxLines) break;
-      size -= Math.max(1, Math.round(size * 0.06));
+  // Draw wrapped text center-aligned, return new Y
+  const drawWC = (text, cx, y, maxW, lineH) => {
+    const words = text.split(" "); let line="";
+    for (const w of words) {
+      const t = line ? line+" "+w : w;
+      if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line,cx,y); y+=lineH; line=w; } else line=t;
     }
-    return size;
+    if (line) { ctx.fillText(line,cx,y); y+=lineH; }
+    return y;
   };
 
-  // ── LAYOUT PLANNING ──
-  // Reserve space: header block + 2 cards + CTA. Cards are dynamic height.
-  // Strategy: measure everything first, then draw.
+  // Shrink font until text fits in maxLines — returns pixel size
+  const fitFont = (text, startPx, fontStr, maxW, maxLines) => {
+    let sz = startPx;
+    while (sz > 12) {
+      ctx.font = fontStr.replace("$", sz);
+      if (countLines(text, maxW) <= maxLines) break;
+      sz = Math.max(12, sz - Math.max(1, Math.round(sz * 0.07)));
+    }
+    return sz;
+  };
 
-  const withDeltas = (round && round.length)
-    ? round.map((q,i) => ({ q, g:guesses[i], delta: guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999 }))
+  // ── Data ──
+  const withD = (round && round.length)
+    ? round.map((q,i) => ({ q, g:guesses[i], delta:guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999 }))
     : [];
-  const best  = withDeltas.length ? [...withDeltas].sort((a,b)=>a.delta-b.delta)[0] : null;
-  const worst = withDeltas.length ? [...withDeltas].sort((a,b)=>b.delta-a.delta)[0] : null;
+  const best  = withD.length ? [...withD].sort((a,b)=>a.delta-b.delta)[0]  : null;
+  const worst = withD.length ? [...withD].sort((a,b)=>b.delta-a.delta)[0] : null;
 
-  // Fixed header heights
-  const logoSize   = sp(90);
-  const logoLineH  = sp(100);
-  const subSize    = sp(42);
-  const subLineH   = sp(52);
-  const introSize  = sp(36);
-  const numSize    = sp(170);
-  const ctaH       = sp(120);
-  const ctaMargin  = sp(24);
-  const cardPadV   = sp(20); // top/bottom padding inside card
-  const tagH       = sp(30);
-  const numRowH    = sp(80);
-  const cardGap    = sp(16);
+  // ── PASS 1: measure total content at base scale ──
+  // Base scale: W/1080 so fonts are proportional to canvas width
+  const S = W / 1080;
+  const px = n => Math.round(n * S); // base pixel size
 
-  // Measure question + answer heights dynamically for each card
+  // Header block heights (fixed)
+  const LOGO_H    = px(110);  // KNOWTIENT logo
+  const SUB_H     = px(60);   // subhead line
+  const INTRO_H   = px(50);   // avg intro line
+  const NUM_H     = px(200);  // big number
+  const CARD_GAP  = px(18);
+  const CTA_MIN_H = px(130);  // minimum CTA height
+  const CTA_PAD   = px(24);   // space before CTA
+  const V_PAD     = px(50);   // top/bottom canvas padding
+
+  // Measure one card's height
   const measureCard = (item) => {
-    if (!item) return sp(200);
-    // Question: fit in 3 lines max, shrink font
-    const qSize = fitFont(item.q.question, 32, "'Space Grotesk', sans-serif", innerW-sp(32), 3);
-    ctx.font = `700 ${qSize}px 'Space Grotesk', sans-serif`;
-    const qLines = measureLines(item.q.question, innerW-sp(32));
-    const qH = qLines * Math.round(qSize * 1.35);
-
-    const ansText = `Correct answer: ${item.q.correct_answer}`;
-    const aSize = fitFont(ansText, 26, "'Space Grotesk', sans-serif", innerW-sp(32), 3);
-    ctx.font = `${aSize}px 'Space Grotesk', sans-serif`;
-    const aLines = measureLines(ansText, innerW-sp(32));
-    const aH = aLines * Math.round(aSize * 1.35);
-
-    return cardPadV + tagH + sp(12) + qH + sp(10) + aH + sp(16) + numRowH + cardPadV;
+    if (!item) return 0;
+    const cardIW = IW - px(36);
+    // Tag
+    const tagH = px(32);
+    // Question: fit to 4 lines max
+    const qSz  = fitFont(item.q.question, px(30), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
+    ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
+    const qH   = countLines(item.q.question, cardIW) * Math.round(qSz * 1.4);
+    // Answer: fit to 4 lines max, full text no truncation
+    const ansT = `Correct answer: ${item.q.correct_answer}`;
+    const aSz  = fitFont(ansT, px(24), "$px 'Space Grotesk',sans-serif", cardIW, 4);
+    ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
+    const aH   = countLines(ansT, cardIW) * Math.round(aSz * 1.4);
+    // Nums row
+    const numRowH = px(78);
+    // Padding: top + tag + gap + q + gap + a + gap + nums + bottom
+    return px(18) + tagH + px(10) + qH + px(8) + aH + px(12) + numRowH + px(18);
   };
 
-  const cardBestH  = best  ? measureCard(best)  : 0;
-  const cardWorstH = worst ? measureCard(worst) : 0;
+  const cardBH = best  ? measureCard(best)  : 0;
+  const cardWH = worst ? measureCard(worst) : 0;
 
-  // Total fixed content height (header + cards + CTA)
-  const headerH = sp(70) + logoLineH + sp(16)
-    + subLineH * measureLines("What % of Americans answered questions correctly?", innerW) + sp(16)
-    + introSize + sp(16)
-    + numSize + sp(20);
-  const totalContent = headerH + cardBestH + cardGap + cardWorstH + ctaMargin + ctaH + sp(40);
+  const totalH = V_PAD + LOGO_H + SUB_H + INTRO_H + NUM_H + px(16)
+               + cardBH + CARD_GAP + cardWH + CTA_PAD + CTA_MIN_H + V_PAD;
 
-  // If content > canvas height, we need to scale everything down proportionally
-  const globalScale = totalContent > H ? (H / totalContent) : 1.0;
-  const gs = n => Math.round(n * globalScale);
+  // ── PASS 2: compute global scale factor ──
+  const GS = totalH > H ? (H / totalH) : 1.0;
+  const g  = n => Math.round(n * GS); // apply global scale on top of base
 
-  // ── DRAW ──
-  let y = gs(sp(56));
+  // ── PASS 3: draw everything ──
+  let y = g(V_PAD);
 
-  // KNOWTIENT logo
-  ctx.font = `${gs(logoSize)}px Righteous, cursive`;
+  // KNOWTIENT logo (KNOW lower than TIENT)
+  const logoSz = g(px(88));
+  ctx.font = `${logoSz}px Righteous,cursive`;
   ctx.fillStyle = "#C6FF00";
-  ctx.shadowColor = "rgba(198,255,0,0.5)"; ctx.shadowBlur = gs(sp(18));
+  ctx.shadowColor = "rgba(198,255,0,0.5)"; ctx.shadowBlur = g(px(16));
   ctx.textAlign = "center";
-  const ktKnowW = ctx.measureText("KNOW").width;
-  const ktTientW = ctx.measureText("TIENT").width;
-  const ktGap = gs(sp(3));
-  const ktTotalW = ktKnowW + ktGap + ktTientW;
-  const ktStartX = W/2 - ktTotalW/2;
-  ctx.fillText("KNOW",  ktStartX + ktKnowW/2,            y + gs(logoSize) + gs(sp(4)));
-  ctx.fillText("TIENT", ktStartX + ktKnowW + ktGap + ktTientW/2, y + gs(logoSize));
+  const kW = ctx.measureText("KNOW").width;
+  const tW = ctx.measureText("TIENT").width;
+  const gap3 = g(px(4));
+  const kx = W/2 - (kW+gap3+tW)/2;
+  ctx.fillText("KNOW",  kx + kW/2,            y + logoSz + g(px(4)));
+  ctx.fillText("TIENT", kx + kW + gap3 + tW/2, y + logoSz);
   ctx.shadowBlur = 0;
-  y += gs(logoLineH);
+  y += g(LOGO_H);
 
   // Subhead
-  ctx.textAlign = "center";
-  const subFS = gs(subSize);
-  ctx.font = `700 ${subFS}px 'Space Grotesk', sans-serif`;
-  ctx.fillStyle = "#F5F0E8";
-  y = drawWrapped("What % of Americans answered questions correctly?", W/2, y + gs(sp(14)), innerW, gs(subLineH), "center");
+  const subSz = g(px(38));
+  ctx.font = `700 ${subSz}px 'Space Grotesk',sans-serif`;
+  ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
+  y = drawWC("What % of Americans answered questions correctly?", W/2, y + g(px(10)), IW, Math.round(subSz*1.35));
 
   // Avg intro
-  const introFS = gs(introSize);
-  ctx.font = `${introFS}px 'Space Grotesk', sans-serif`;
-  ctx.fillStyle = "#C8C3B8";
-  ctx.textAlign = "center";
-  ctx.fillText("My average guess was off by:", W/2, y + gs(sp(14)));
-  y += gs(sp(14)) + gs(introFS) + gs(sp(12));
+  const introSz = g(px(30));
+  ctx.font = `${introSz}px 'Space Grotesk',sans-serif`;
+  ctx.fillStyle = "#C8C3B8"; ctx.textAlign = "center";
+  ctx.fillText("My average guess was off by:", W/2, y + g(px(8)) + introSz);
+  y += g(px(8)) + introSz + g(px(10));
 
-  // Big number
-  const bigNumFS = gs(numSize);
-  ctx.font = `${bigNumFS}px Righteous, cursive`;
+  // Big avg number
+  const numSz = g(px(160));
+  ctx.font = `${numSz}px Righteous,cursive`;
   ctx.fillStyle = "#F5A623";
-  ctx.shadowColor = "rgba(245,166,35,0.6)"; ctx.shadowBlur = gs(sp(28));
+  ctx.shadowColor = "rgba(245,166,35,0.6)"; ctx.shadowBlur = g(px(24));
   ctx.textAlign = "center";
-  ctx.fillText(`${avg.toFixed(1)}%`, W/2, y + gs(numSize));
+  ctx.fillText(`${avg.toFixed(1)}%`, W/2, y + numSz);
   ctx.shadowBlur = 0;
-  y += gs(numSize) + gs(sp(20));
+  y += numSz + g(px(18));
   ctx.textAlign = "left";
 
-  // ── DRAW CARD ──
+  // Draw a card, return bottom Y
   const drawCard = (item, type, cardY, cardH) => {
-    const borderCol = type==="best" ? "#3DB87A" : "#FF2D2D";
-    rr(pad, cardY, innerW, cardH, gs(sp(14)), "#363375", borderCol, gs(sp(3)));
-
-    let cy = cardY + gs(cardPadV);
+    const bc = type==="best" ? "#3DB87A" : "#FF2D2D";
+    rr(PAD, cardY, IW, cardH, g(px(14)), "#363375", bc, g(px(3)));
+    const cardIW = IW - g(px(36));
+    let cy = cardY + g(px(18));
 
     // Tag
-    ctx.font = `700 ${gs(sp(24))}px 'DM Mono', monospace`;
-    ctx.fillStyle = borderCol;
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", pad+gs(sp(18)), cy+gs(tagH));
-    cy += gs(tagH) + gs(sp(12));
+    ctx.font = `700 ${g(px(22))}px 'DM Mono',monospace`;
+    ctx.fillStyle = bc;
+    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), cy+g(px(28)));
+    cy += g(px(32)) + g(px(10));
 
-    // Question — fit font to 3 lines
-    const qSize = fitFont(item.q.question, 32, "'Space Grotesk', sans-serif", innerW-gs(sp(32)), 3);
-    ctx.font = `700 ${qSize}px 'Space Grotesk', sans-serif`;
+    // Question — dynamic font, full text, up to 4 lines
+    const qSz = fitFont(item.q.question, g(px(30)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
+    ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
     ctx.fillStyle = "#F5F0E8";
-    cy = drawWrapped(item.q.question, pad+gs(sp(18)), cy, innerW-gs(sp(32)), Math.round(qSize*1.4));
-    cy += gs(sp(8));
+    cy = drawW(item.q.question, PAD+g(px(18)), cy, cardIW, Math.round(qSz*1.4));
+    cy += g(px(8));
 
-    // Answer — fit font to 3 lines, no truncation
-    const ansText = `Correct answer: ${item.q.correct_answer}`;
-    const aSize = fitFont(ansText, 26, "'Space Grotesk', sans-serif", innerW-gs(sp(32)), 3);
-    ctx.font = `${aSize}px 'Space Grotesk', sans-serif`;
+    // Answer — dynamic font, full text, up to 4 lines, no truncation
+    const ansT = `Correct answer: ${item.q.correct_answer}`;
+    const aSz  = fitFont(ansT, g(px(24)), "$px 'Space Grotesk',sans-serif", cardIW, 4);
+    ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
     ctx.fillStyle = "#C8C3B8";
-    cy = drawWrapped(ansText, pad+gs(sp(18)), cy, innerW-gs(sp(32)), Math.round(aSize*1.4));
-    cy += gs(sp(12));
+    cy = drawW(ansT, PAD+g(px(18)), cy, cardIW, Math.round(aSz*1.4));
+    cy += g(px(12));
 
     // Numbers row
     const numCols = [
       { label:"Real %",    val:`${item.q.pct_correct}%`, color:"#F5A623" },
       { label:"Your guess",val:`${item.g.guess}%`,        color:"#00F0FF" },
-      { label:"Off by",    val:`±${item.delta}`, color: item.delta<=10?"#C6FF00":item.delta<=19?"#F5A623":"#FF2D2D" },
+      { label:"Off by",    val:`±${item.delta}`, color:item.delta<=10?"#C6FF00":item.delta<=19?"#F5A623":"#FF2D2D" },
     ];
-    const colW = innerW / 3;
     numCols.forEach((nc, ci) => {
-      const nx = pad + gs(sp(10)) + ci * colW;
-      ctx.font = `${gs(sp(46))}px Righteous, cursive`; ctx.fillStyle = nc.color;
-      ctx.fillText(nc.val, nx, cy + gs(sp(44)));
-      ctx.font = `500 ${gs(sp(22))}px 'DM Mono', monospace`; ctx.fillStyle = "#C8C3B8";
-      ctx.fillText(nc.label, nx, cy + gs(sp(44)) + gs(sp(24)));
+      const nx = PAD + g(px(10)) + ci * (IW/3);
+      ctx.font = `${g(px(42))}px Righteous,cursive`; ctx.fillStyle = nc.color;
+      ctx.fillText(nc.val, nx, cy + g(px(40)));
+      ctx.font = `500 ${g(px(20))}px 'DM Mono',monospace`; ctx.fillStyle = "#C8C3B8";
+      ctx.fillText(nc.label, nx, cy + g(px(40)) + g(px(22)));
     });
+    return cardY + cardH;
   };
 
-  // Draw both cards
-  if (best)  drawCard(best,  "best",  y,                    gs(cardBestH));
-  if (worst) drawCard(worst, "worst", y + gs(cardBestH) + gs(cardGap), gs(cardWorstH));
-  y += gs(cardBestH) + gs(cardGap) + gs(cardWorstH);
+  // Draw cards
+  const scaledBH = g(cardBH);
+  const scaledWH = g(cardWH);
+  if (best)  { y = drawCard(best,  "best",  y, scaledBH) + g(CARD_GAP); }
+  if (worst) { y = drawCard(worst, "worst", y, scaledWH); }
 
-  // CTA — always at bottom, expand to fill remaining space
-  const ctaActualH = Math.max(gs(ctaH), H - y - gs(sp(32)));
-  const ctaY = y + gs(sp(16));
-  rr(pad, ctaY, innerW, ctaActualH, gs(sp(12)), "#F5A623");
+  // CTA — fill remaining space, minimum height guaranteed
+  const ctaY = y + g(CTA_PAD);
+  const ctaH = Math.max(g(CTA_MIN_H), H - ctaY - g(px(28)));
+  rr(PAD, ctaY, IW, ctaH, g(px(12)), "#F5A623");
   ctx.textAlign = "center";
-  // Two lines in CTA
-  const ctaSize1 = gs(sp(36));
-  const ctaSize2 = gs(sp(44));
-  ctx.font = `700 ${ctaSize1}px 'Space Grotesk', sans-serif`;
+  const cta1Sz = Math.min(g(px(32)), Math.round(ctaH * 0.28));
+  const cta2Sz = Math.min(g(px(42)), Math.round(ctaH * 0.36));
+  ctx.font = `700 ${cta1Sz}px 'Space Grotesk',sans-serif`;
   ctx.fillStyle = "#2D2A5E";
-  ctx.fillText("Can you beat it?", W/2, ctaY + ctaActualH*0.38);
-  ctx.font = `700 ${ctaSize2}px Righteous, cursive`;
-  ctx.fillText("Knowtient.game", W/2, ctaY + ctaActualH*0.72);
+  ctx.fillText("Can you beat it?", W/2, ctaY + ctaH * 0.36);
+  ctx.font = `700 ${cta2Sz}px Righteous,cursive`;
+  ctx.fillText("Knowtient.game", W/2, ctaY + ctaH * 0.72);
   ctx.textAlign = "left";
 
   return canvas.toDataURL("image/png");
@@ -426,7 +423,7 @@ const GlobalStyles = () => (
     .card-big-miss { background:var(--color-big-miss-bg); border:2px solid var(--color-big-miss-border); border-radius:14px; padding:14px 16px; }
 
     /* QUESTION SCREEN */
-    .question-screen { display:flex; flex-direction:column; min-height:100%; }
+    .question-screen { display:flex; flex-direction:column; min-height:100%; overflow-y:visible; }
     .q-meta-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; margin-top:2px; flex-shrink:0; }
     .q-category-pill { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; color:var(--color-secondary); text-transform:uppercase; letter-spacing:0.06em; }
     .q-source-dot { width:4px; height:4px; border-radius:50%; background:var(--color-border); flex-shrink:0; }
@@ -449,7 +446,7 @@ const GlobalStyles = () => (
     .slider-input::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:var(--color-amber); border:3px solid var(--color-base); cursor:grab; }
 
     /* ANSWER CHOICES */
-    .answer-choices-wrap { overflow-y:visible; overflow-x:hidden; scrollbar-width:none; }
+    .answer-choices-wrap { overflow-y:visible; overflow-x:hidden; }
     .answer-choices-wrap::-webkit-scrollbar { display:none; }
     /* Question screen scrolls as a whole on mobile — no inner scroll container */
     .answer-choices-label { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); opacity:0.7; margin-bottom:9px; }
@@ -612,8 +609,8 @@ const GlobalStyles = () => (
 
     /* TITLE BAR — hidden on end screen */
     .app-title-bar { display:flex; align-items:center; justify-content:center; padding:10px 18px 4px; flex-shrink:0; }
-    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); display:inline-flex; align-items:baseline; gap:2px; }
-    .kt-know  { position:relative; top:3px; }
+    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); display:inline-flex; align-items:baseline; gap:1px; }
+    .kt-know  { position:relative; top:2px; }
     .kt-tient { position:relative; top:0; }
 
     /* ══ TITLE SCREEN ══ */
@@ -625,11 +622,11 @@ const GlobalStyles = () => (
     .dict-title-wrap { width:100%; }
     /* KNOWTIENT title — KNOW slides from left, TIENT slides from right */
     .dict-title-wrap { display:flex; align-items:baseline; gap:0; justify-content:center; width:100%; }
-    .dict-chunk { display:inline-block; font-family:'Righteous',cursive; font-size:65px; color:#C6FF00; text-shadow:2px 3px 0 #1a7a50,0 0 22px rgba(198,255,0,0.75); opacity:0; }
+    .dict-chunk { display:inline-block; font-family:'Righteous',cursive; font-size:58px; color:#C6FF00; text-shadow:2px 3px 0 #1a7a50,0 0 22px rgba(198,255,0,0.75); opacity:0; }
     .dict-chunk.know { transform:translateX(-120px) scale(0.85); }
     .dict-chunk.rate { transform:translateX(120px) scale(0.85); }
     /* Logo: KNOW sits lower than TIENT, small gap between halves */
-    .dict-chunk.know.landed, .dict-chunk.know.dance { position:relative; top:5px; margin-right:3px; }
+    .dict-chunk.know.landed, .dict-chunk.know.dance { position:relative; top:3px; margin-right:2px; }
     .dict-chunk.rate.landed, .dict-chunk.rate.dance { position:relative; top:0px; }
     .dict-chunk.fly-in { animation:chunkFlyIn 0.55s cubic-bezier(0.22,1.4,0.36,1) forwards; }
     @keyframes chunkFlyIn { 0%{opacity:0} 100%{opacity:1;transform:translateX(0) scale(1)} }
@@ -1387,7 +1384,14 @@ export default function App() {
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
   }, [questions]);
 
-  const handlePlayAgain = useCallback(() => setScreen("title"), []);
+  const handlePlayAgain = useCallback(() => {
+    // Reset audio context so it works fresh on next round (mobile suspension fix)
+    try {
+      if (audioCtx) { audioCtx.close(); }
+    } catch {}
+    audioCtx = null;
+    setScreen("title");
+  }, []);
 
   const handleSubmit = (guess) => {
     setLastGuess(guess); setQAnim("screen-exit");
