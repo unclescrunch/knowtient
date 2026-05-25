@@ -11,6 +11,8 @@ const isMobile = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent
 let audioCtx = null;
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Resume if suspended (happens on mobile after page loses focus or after first gesture)
+  if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 function playTick(value) {
@@ -238,10 +240,10 @@ function drawShareCanvas(avg, guesses, round, width, height) {
   ctx.textAlign = "center";
   const ktKnowW = ctx.measureText("KNOW").width;
   const ktTientW = ctx.measureText("TIENT").width;
-  const ktGap = gs(sp(5));
+  const ktGap = gs(sp(3));
   const ktTotalW = ktKnowW + ktGap + ktTientW;
   const ktStartX = W/2 - ktTotalW/2;
-  ctx.fillText("KNOW",  ktStartX + ktKnowW/2,            y + gs(logoSize) + gs(sp(8)));
+  ctx.fillText("KNOW",  ktStartX + ktKnowW/2,            y + gs(logoSize) + gs(sp(4)));
   ctx.fillText("TIENT", ktStartX + ktKnowW + ktGap + ktTientW/2, y + gs(logoSize));
   ctx.shadowBlur = 0;
   y += gs(logoLineH);
@@ -424,7 +426,7 @@ const GlobalStyles = () => (
     .card-big-miss { background:var(--color-big-miss-bg); border:2px solid var(--color-big-miss-border); border-radius:14px; padding:14px 16px; }
 
     /* QUESTION SCREEN */
-    .question-screen { display:flex; flex-direction:column; height:100%; }
+    .question-screen { display:flex; flex-direction:column; min-height:100%; }
     .q-meta-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; margin-top:2px; flex-shrink:0; }
     .q-category-pill { font-family:'DM Mono',monospace; font-size:17px; font-weight:500; color:var(--color-secondary); text-transform:uppercase; letter-spacing:0.06em; }
     .q-source-dot { width:4px; height:4px; border-radius:50%; background:var(--color-border); flex-shrink:0; }
@@ -447,8 +449,9 @@ const GlobalStyles = () => (
     .slider-input::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:var(--color-amber); border:3px solid var(--color-base); cursor:grab; }
 
     /* ANSWER CHOICES */
-    .answer-choices-wrap { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; -webkit-mask-image:linear-gradient(to bottom,black 85%,transparent 100%); mask-image:linear-gradient(to bottom,black 85%,transparent 100%); }
+    .answer-choices-wrap { overflow-y:visible; overflow-x:hidden; scrollbar-width:none; }
     .answer-choices-wrap::-webkit-scrollbar { display:none; }
+    /* Question screen scrolls as a whole on mobile — no inner scroll container */
     .answer-choices-label { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); opacity:0.7; margin-bottom:9px; }
     .answer-choices { display:flex; flex-direction:column; gap:8px; padding-bottom:16px; }
     .answer-choice { display:flex; align-items:flex-start; gap:12px; background:rgba(54,51,117,0.5); border:1.5px solid rgba(78,74,138,0.5); border-radius:8px; padding:12px 14px; opacity:0; transform:translateY(14px) scale(0.97); pointer-events:none; cursor:default; user-select:none; }
@@ -609,8 +612,8 @@ const GlobalStyles = () => (
 
     /* TITLE BAR — hidden on end screen */
     .app-title-bar { display:flex; align-items:center; justify-content:center; padding:10px 18px 4px; flex-shrink:0; }
-    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); display:inline-flex; align-items:baseline; gap:3px; }
-    .kt-know  { position:relative; top:5px; }
+    .app-title-bar-text { font-family:'Righteous',cursive; font-size:26px; color:#C6FF00; letter-spacing:0.06em; text-shadow:1px 2px 0 #1a7a50,0 0 14px rgba(198,255,0,0.55); display:inline-flex; align-items:baseline; gap:2px; }
+    .kt-know  { position:relative; top:3px; }
     .kt-tient { position:relative; top:0; }
 
     /* ══ TITLE SCREEN ══ */
@@ -622,11 +625,11 @@ const GlobalStyles = () => (
     .dict-title-wrap { width:100%; }
     /* KNOWTIENT title — KNOW slides from left, TIENT slides from right */
     .dict-title-wrap { display:flex; align-items:baseline; gap:0; justify-content:center; width:100%; }
-    .dict-chunk { display:inline-block; font-family:'Righteous',cursive; font-size:72px; color:#C6FF00; text-shadow:2px 3px 0 #1a7a50,0 0 22px rgba(198,255,0,0.75); opacity:0; }
+    .dict-chunk { display:inline-block; font-family:'Righteous',cursive; font-size:65px; color:#C6FF00; text-shadow:2px 3px 0 #1a7a50,0 0 22px rgba(198,255,0,0.75); opacity:0; }
     .dict-chunk.know { transform:translateX(-120px) scale(0.85); }
     .dict-chunk.rate { transform:translateX(120px) scale(0.85); }
     /* Logo: KNOW sits lower than TIENT, small gap between halves */
-    .dict-chunk.know.landed, .dict-chunk.know.dance { position:relative; top:10px; margin-right:6px; }
+    .dict-chunk.know.landed, .dict-chunk.know.dance { position:relative; top:5px; margin-right:3px; }
     .dict-chunk.rate.landed, .dict-chunk.rate.dance { position:relative; top:0px; }
     .dict-chunk.fly-in { animation:chunkFlyIn 0.55s cubic-bezier(0.22,1.4,0.36,1) forwards; }
     @keyframes chunkFlyIn { 0%{opacity:0} 100%{opacity:1;transform:translateX(0) scale(1)} }
@@ -1377,6 +1380,8 @@ export default function App() {
   const questions = questionsData.questions;
 
   const startRound = useCallback(() => {
+    // Resume audio context on each new round (mobile browsers suspend it)
+    try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
     const r = buildRound(questions);
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
