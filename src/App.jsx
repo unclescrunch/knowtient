@@ -261,8 +261,8 @@ function drawShareCanvas(avg, guesses, round) {
   ctx.font=`bold 130px 'Space Grotesk',sans-serif`;
   const avgStr=`${avg.toFixed(1)}%`;
   const aw=ctx.measureText(avgStr).width,nx=Math.round((W-aw)/2);
-  ctx.fillStyle="#E8634A";ctx.fillText(avgStr,nx+8,y+8);
-  ctx.fillStyle="#F5A623";ctx.fillText(avgStr,nx,y);
+  ctx.fillStyle="#E8634A";ctx.fillText(avgStr,nx+8,y+130+8);
+  ctx.fillStyle="#F5A623";ctx.fillText(avgStr,nx,y+130);
   y+=138+gap;
 
   // CTA — alternating stripes
