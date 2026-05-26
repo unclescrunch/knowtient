@@ -99,235 +99,197 @@ function playEndChime() {
 }
 
 // ─── SHARE IMAGE GENERATOR ────────────────────────────────────────────────────
-// Always 1080x1080. Used for all share/download on mobile and desktop.
+// Always 1080x1080. Layout: logo → tagline → highlight card → avg+% → CTA
+// Dynamic font sizing: question/answer shrink to fit, nothing ever overflows.
 function drawShareCanvas(avg, guesses, round) {
   const W = 1080, H = 1080;
   const canvas = document.createElement("canvas");
   const dpr = 2;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
+  canvas.width = W * dpr; canvas.height = H * dpr;
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
-
   const PAD = 52, IW = W - PAD * 2;
 
-  // ── Background gradient ──
-  const grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0, "#2D2A5E"); grad.addColorStop(1, "#1a1840");
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
-  // Subtle diagonal stripes
-  ctx.save(); ctx.globalAlpha = 0.04; ctx.strokeStyle = "#C6FF00"; ctx.lineWidth = 1;
-  for (let x = -H; x < W+H; x += 52) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
+  // Background + stripes
+  const grad = ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,"#2D2A5E"); grad.addColorStop(1,"#1a1840");
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.globalAlpha=0.04; ctx.strokeStyle="#C6FF00"; ctx.lineWidth=1;
+  for(let x=-H;x<W+H;x+=52){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+H,H);ctx.stroke();}
   ctx.restore();
 
-  // ── Helpers ──
-  const rr = (x,y,w,h,r,fill,strokeCol,strokeW) => {
+  // Helpers
+  const rr=(x,y,w,h,r,fill,sc,sw)=>{
     ctx.beginPath();
-    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+    ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
     ctx.closePath();
-    if (fill) { ctx.fillStyle=fill; ctx.fill(); }
-    if (strokeCol) { ctx.strokeStyle=strokeCol; ctx.lineWidth=strokeW||2; ctx.stroke(); }
+    if(fill){ctx.fillStyle=fill;ctx.fill();}
+    if(sc){ctx.strokeStyle=sc;ctx.lineWidth=sw||2;ctx.stroke();}
   };
-  const centeredText = (text, font, cx, y, fill) => {
-    ctx.font = font; ctx.fillStyle = fill; ctx.textAlign = "center";
-    ctx.fillText(text, cx, y); ctx.textAlign = "left";
+  const ctr=(text,font,cx,y,fill)=>{
+    ctx.font=font;ctx.fillStyle=fill;ctx.textAlign="center";
+    ctx.fillText(text,cx,y);ctx.textAlign="left";
   };
-  const wl = (text, font, mw) => {
-    ctx.font = font;
-    const words = text.split(" "); let line = "", lines = [];
-    for (const w of words) {
-      const t = line ? line+" "+w : w;
-      if (ctx.measureText(t).width > mw && line) { lines.push(line); line=w; } else line=t;
+  const wrapL=(text,font,mw)=>{
+    ctx.font=font;
+    const words=text.split(" ");let line="",lines=[];
+    for(const w of words){
+      const t=line?line+" "+w:w;
+      if(ctx.measureText(t).width>mw&&line){lines.push(line);line=w;}else line=t;
     }
-    if (line) lines.push(line);
-    return lines;
+    if(line)lines.push(line);return lines;
   };
-  const drawLeft = (lines, font, x, y, fill, lh) => {
-    ctx.font = font; ctx.fillStyle = fill; ctx.textAlign = "left";
-    lines.forEach(l => { ctx.fillText(l, x, y); y += lh; });
-    return y;
+  const drawLL=(lines,font,x,y,fill,lh)=>{
+    ctx.font=font;ctx.fillStyle=fill;ctx.textAlign="left";
+    lines.forEach(l=>{ctx.fillText(l,x,y);y+=lh;});return y;
   };
 
-  // ── Logo fonts (78px KNOWTIENT, 28px .com) ──
-  // Use textMetrics to pixel-align baselines
-  const LSIZ = 78, CSIZ = 28;
-  ctx.font = `bold ${LSIZ}px 'Space Grotesk', sans-serif`;
-  const mK = ctx.measureText("KNOW");
-  const mT = ctx.measureText("TIENT");
-  ctx.font = `bold ${CSIZ}px 'Space Grotesk', sans-serif`;
-  const mC = ctx.measureText(".com");
-
-  const kw = mK.width, tw = mT.width, cw = mC.width;
-  const lx = (W - (kw+6+tw+5+cw)) / 2;
-  const txPos = lx+kw+6, comxPos = txPos+tw+5;
-
-  // TIENT top at y=28 → TIENT baseline = 28 + LSIZ (approx ascent = font size for canvas)
-  const TIENT_BL = 28 + LSIZ;
-  const KNOW_BL  = TIENT_BL + 10;
-  // .com bottom aligns with KNOW bottom: KNOW bottom ≈ KNOW_BL + LSIZ*0.22
-  // .com bottom ≈ COM_BL + CSIZ*0.22 → COM_BL = (KNOW_BL + LSIZ*0.22) - CSIZ*0.22
-  const COM_BL   = (KNOW_BL + Math.round(LSIZ*0.22)) - Math.round(CSIZ*0.22);
-  const LOGO_BOTTOM = KNOW_BL + Math.round(LSIZ*0.22) + 6;
-
-  const logoWord = (text, sz, bx, bl, sdx, sdy) => {
-    const font = `bold ${sz}px 'Space Grotesk', sans-serif`;
-    ctx.font = font; ctx.textAlign = "left";
-    ctx.fillStyle = "#00C8DC"; ctx.fillText(text, bx+sdx, bl+sdy);
-    ctx.fillStyle = "#0F4619"; ctx.fillText(text, bx+2, bl+2);
-    ctx.fillStyle = "#C6FF00"; ctx.fillText(text, bx, bl);
+  // ── Logo ──
+  const LSIZ=78,CSIZ=28;
+  ctx.font=`bold ${LSIZ}px 'Space Grotesk',sans-serif`;
+  const kw=ctx.measureText("KNOW").width,tw=ctx.measureText("TIENT").width;
+  ctx.font=`bold ${CSIZ}px 'Space Grotesk',sans-serif`;
+  const cw=ctx.measureText(".com").width;
+  const lx=(W-(kw+6+tw+5+cw))/2,txP=lx+kw+6,cxP=txP+tw+5;
+  ctx.font=`bold ${LSIZ}px 'Space Grotesk',sans-serif`;
+  const mK=ctx.measureText("KNOW"),mT=ctx.measureText("TIENT");
+  ctx.font=`bold ${CSIZ}px 'Space Grotesk',sans-serif`;
+  const mC=ctx.measureText(".com");
+  const LOGO_TOP=28;
+  const TIENT_BL=LOGO_TOP+(mT.actualBoundingBoxAscent||LSIZ*0.78);
+  const KNOW_BL=TIENT_BL+10;
+  const KNOW_PIX_BOT=KNOW_BL+(mK.actualBoundingBoxDescent||LSIZ*0.22);
+  const COM_BL=KNOW_PIX_BOT-(mC.actualBoundingBoxDescent||CSIZ*0.22);
+  const LOGO_END=Math.ceil(KNOW_PIX_BOT)+6;
+  const logoW=(text,sz,bx,bl,sdx,sdy)=>{
+    const f=`bold ${sz}px 'Space Grotesk',sans-serif`;
+    ctx.font=f;ctx.textAlign="left";
+    ctx.fillStyle="#00C8DC";ctx.fillText(text,bx+sdx,bl+sdy);
+    ctx.fillStyle="#0F4619";ctx.fillText(text,bx+2,bl+2);
+    ctx.fillStyle="#C6FF00";ctx.fillText(text,bx,bl);
   };
-  logoWord("KNOW",  LSIZ, lx,      KNOW_BL,  5, 5);
-  logoWord("TIENT", LSIZ, txPos,   TIENT_BL, 5, 5);
-  logoWord(".com",  CSIZ, comxPos, COM_BL,   3, 3);
+  logoW("KNOW",LSIZ,lx,KNOW_BL,5,5);
+  logoW("TIENT",LSIZ,txP,TIENT_BL,5,5);
+  logoW(".com",CSIZ,cxP,COM_BL,3,3);
 
-  // ── Body font: find largest size where longest line fits IW ──
-  const LINE1 = "Guess what % of Americans knew the answers to";
-  const LINE2 = "seven common questions.";
-  const INTRO = "My average guess was off by:";
-  let bodyFontSz = 30;
-  while (bodyFontSz > 16) {
-    ctx.font = `bold ${bodyFontSz}px 'Space Grotesk', sans-serif`;
-    if (Math.max(ctx.measureText(LINE1).width, ctx.measureText(INTRO).width) <= IW) break;
-    bodyFontSz--;
+  // ── Body font ──
+  const L1="Guess what % of Americans knew the answers to";
+  const L2="seven common questions.";
+  const INTRO="My average guess was off by:";
+  let bfSz=30;
+  while(bfSz>16){
+    ctx.font=`bold ${bfSz}px 'Space Grotesk',sans-serif`;
+    if(Math.max(ctx.measureText(L1).width,ctx.measureText(INTRO).width)<=IW)break;
+    bfSz--;
   }
-  const BODY_FONT = `bold ${bodyFontSz}px 'Space Grotesk', sans-serif`;
-  const LH = bodyFontSz + 8;
+  const BF=`bold ${bfSz}px 'Space Grotesk',sans-serif`;
+  const LH=bfSz+8;
 
-  // ── Card measurements ──
-  const f_q = `bold 24px 'Space Grotesk', sans-serif`;
-  const f_a = `22px 'Space Grotesk', sans-serif`;
-  const f_n = `bold 72px 'Space Grotesk', sans-serif`;
-  const f_l = `bold 17px 'Space Grotesk', sans-serif`;
-  const PIN = 22, ICW = IW - PIN*2;
-  const TAG_H_C = 22+10;
+  // ── Card data ──
+  const withD=(round&&round.length)
+    ?round.map((q,i)=>({q,g:guesses[i],delta:guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999}))
+    :[];
+  const best=withD.length?[...withD].sort((a,b)=>a.delta-b.delta)[0]:null;
+  const cardQ=best?best.q.question:"—";
+  const cardA=best?`Correct answer: ${best.q.correct_answer}`:"—";
+  const cardReal=best?best.q.pct_correct:0;
+  const cardMy=best&&best.g?best.g.guess:0;
+  const PIN=22,ICW=IW-PIN*2;
 
-  const withD = (round && round.length)
-    ? round.map((q,i) => ({ q, g:guesses[i], delta:guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999 }))
-    : [];
-  const best = withD.length ? [...withD].sort((a,b)=>a.delta-b.delta)[0] : null;
-
-  const cardQ = best ? best.q.question : "—";
-  const cardA = best ? `Correct answer: ${best.q.correct_answer}` : "—";
-  const cardReal = best ? best.q.pct_correct : 0;
-  const cardMy   = best && best.g ? best.g.guess : 0;
-
-  ctx.font = f_q;
-  const qLines = wl(cardQ, f_q, ICW);
-  const Q_H = qLines.length * 30 + 8;
-  ctx.font = f_a;
-  const aLines = wl(cardA, f_a, ICW);
-  const A_H = aLines.length * 27 + 10;
-  const NUM_H_C = 76+24+10;
-  const card_h = PIN+TAG_H_C+Q_H+A_H+NUM_H_C+PIN;
+  // Dynamic font sizing — shrink until fits within max lines
+  const fitFont=(text,startSz,fontFn,mw,maxLines)=>{
+    let sz=startSz;
+    while(sz>=14){
+      ctx.font=fontFn(sz);
+      if(wrapL(text,fontFn(sz),mw).length<=maxLines)break;
+      sz--;
+    }
+    return sz;
+  };
+  const qSz=fitFont(cardQ,30,sz=>`bold ${sz}px 'Space Grotesk',sans-serif`,ICW,5);
+  const aSz=fitFont(cardA,26,sz=>`${sz}px 'Space Grotesk',sans-serif`,ICW,3);
+  const F_TAG=`bold 24px 'Space Grotesk',sans-serif`;
+  const F_Q=`bold ${qSz}px 'Space Grotesk',sans-serif`;
+  const F_A=`${aSz}px 'Space Grotesk',sans-serif`;
+  const F_N=`bold 108px 'Space Grotesk',sans-serif`;
+  const F_L=`bold 26px 'Space Grotesk',sans-serif`;
+  const qLines=wrapL(cardQ,F_Q,ICW);
+  const aLines=wrapL(cardA,F_A,ICW);
+  const TAG_H=42,Q_H=qLines.length*(qSz+7)+8,A_H=aLines.length*(aSz+6)+10,NUM_H=156;
+  const card_h=PIN+TAG_H+Q_H+A_H+NUM_H+PIN;
 
   // ── Gap distribution ──
-  const CTA_H = 108;
-  const TAGLINE_H = LH * 2;
-  const INTRO_H = LH;
-  const BIG_NUM_H = 132 + 20;
-  const V_BOT = 28;
-  const fixed_h = LOGO_BOTTOM + TAGLINE_H + INTRO_H + BIG_NUM_H + card_h + CTA_H;
-  const gap = Math.max(14, Math.floor((H - V_BOT - fixed_h) / 6));
+  const fixed_h=LOGO_END+LH*2+card_h+LH+146+108;
+  const gap=Math.max(8,Math.floor((H-28-fixed_h)/6));
 
-  // ── Draw body ──
-  let y = LOGO_BOTTOM + gap + 12;
+  // ── Draw ──
+  let y=LOGO_END+gap;
 
   // Tagline
-  ctx.font = BODY_FONT; ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
-  ctx.fillText(LINE1, W/2, y); y += LH;
-  ctx.fillText(LINE2, W/2, y); y += LH;
-  y += gap/2;
-
-  // Intro
-  ctx.fillStyle = "#C8C3B8";
-  ctx.fillText(INTRO, W/2, y); y += INTRO_H + gap/2;
-  ctx.textAlign = "left";
-
-  // Big avg number
-  const avgStr = `${avg.toFixed(1)}%`;
-  ctx.font = `bold 132px 'Space Grotesk', sans-serif`;
-  const aw = ctx.measureText(avgStr).width;
-  const nx = Math.round((W - aw) / 2);
-  ctx.fillStyle = "#E8634A"; ctx.fillText(avgStr, nx+8, y+8);
-  ctx.fillStyle = "#F5A623"; ctx.fillText(avgStr, nx, y);
-  y += 132 + gap;
+  ctr(L1,BF,W/2,y,"#F5F0E8");y+=LH;
+  ctr(L2,BF,W/2,y,"#F5F0E8");y+=LH+gap;
 
   // Card
-  rr(PAD, y, IW, card_h, 14, "#363375", "#3DB87A", 3);
-  let cy = y + PIN;
-  ctx.font = `bold 19px 'Space Grotesk', sans-serif`; ctx.fillStyle = "#3DB87A";
-  ctx.fillText("★ MY CLOSEST GUESS", PAD+PIN, cy); cy += TAG_H_C;
-  cy = drawLeft(qLines, f_q, PAD+PIN, cy, "#F5F0E8", 30); cy += 8;
-  cy = drawLeft(aLines, f_a, PAD+PIN, cy, "#C8C3B8", 27); cy += 12;
-
-  // 2-col nums
-  const col2 = [{lbl:"Real % who knew", val:`${cardReal}%`, col:"#F5F0E8"},{lbl:"My guess", val:`${cardMy}%`, col:"#F5A623"}];
-  const cw2 = IW/2;
-  col2.forEach(({lbl,val,col},i) => {
-    const ccx = PAD + cw2*i + cw2/2;
-    ctx.font = f_n; ctx.fillStyle = col; ctx.textAlign = "center";
-    ctx.fillText(val, ccx, cy+72);
-    ctx.font = f_l; ctx.fillStyle = "#C8C3B8";
-    ctx.fillText(lbl, ccx, cy+72+26);
+  rr(PAD,y,IW,card_h,14,"#363375","#3DB87A",3);
+  let cy=y+PIN;
+  ctx.font=F_TAG;ctx.fillStyle="#3DB87A";ctx.textAlign="left";
+  ctx.fillText("★ MY CLOSEST GUESS",PAD+PIN,cy);cy+=TAG_H;
+  cy=drawLL(qLines,F_Q,PAD+PIN,cy,"#F5F0E8",qSz+7);cy+=8;
+  cy=drawLL(aLines,F_A,PAD+PIN,cy,"#C8C3B8",aSz+6);cy+=12;
+  const cw2=IW/2;
+  [{lbl:"Real % who knew",val:`${cardReal}%`,col:"#F5F0E8"},
+   {lbl:"My guess",val:`${cardMy}%`,col:"#F5A623"}
+  ].forEach(({lbl,val,col},i)=>{
+    const ccx=PAD+cw2*i+cw2/2;
+    ctx.font=F_N;ctx.fillStyle=col;ctx.textAlign="center";ctx.fillText(val,ccx,cy+108);
+    ctx.font=F_L;ctx.fillStyle="#C8C3B8";ctx.fillText(lbl,ccx,cy+108+30);
   });
-  ctx.textAlign = "left";
-  y += card_h + gap;
+  ctx.textAlign="left";
+  y+=card_h+gap;
 
-  // ── CTA: alternating stripes, text exactly centered ──
-  const BX=PAD, BY=y, BW=IW, BH=CTA_H, R=14;
-  const STRIPE_W = 20;
+  // Avg intro + big number
+  ctr(INTRO,BF,W/2,y,"#C8C3B8");y+=LH+Math.floor(gap/3);
+  ctx.font=`bold 130px 'Space Grotesk',sans-serif`;
+  const avgStr=`${avg.toFixed(1)}%`;
+  const aw=ctx.measureText(avgStr).width,nx=Math.round((W-aw)/2);
+  ctx.fillStyle="#E8634A";ctx.fillText(avgStr,nx+8,y+8);
+  ctx.fillStyle="#F5A623";ctx.fillText(avgStr,nx,y);
+  y+=130+gap;
 
-  // Draw stripes onto offscreen canvas, then clip + composite
-  const stripeCanvas = document.createElement("canvas");
-  stripeCanvas.width = W*dpr; stripeCanvas.height = H*dpr;
-  const sctx = stripeCanvas.getContext("2d");
-  sctx.scale(dpr, dpr);
-  let si = 0;
-  for (let sx = BX-BH; sx < BX+BW+BH; sx += STRIPE_W) {
-    sctx.fillStyle = si%2===0 ? "rgba(200,115,8,0.78)" : "rgba(210,70,40,0.70)";
-    sctx.save();
-    sctx.translate(sx, BY);
-    sctx.beginPath();
-    sctx.moveTo(0,0); sctx.lineTo(STRIPE_W,0); sctx.lineTo(STRIPE_W+BH,BH); sctx.lineTo(BH,BH);
-    sctx.closePath(); sctx.fill(); sctx.restore();
-    si++;
+  // CTA — alternating stripes
+  const BX=PAD,BY=y,BW=IW,BH=108,R=14;
+  const sc=document.createElement("canvas");
+  sc.width=W*dpr;sc.height=H*dpr;
+  const sx=sc.getContext("2d");sx.scale(dpr,dpr);
+  let si=0;
+  for(let x2=BX-BH;x2<BX+BW+BH;x2+=20){
+    sx.fillStyle=si%2===0?"rgba(200,115,8,0.78)":"rgba(210,70,40,0.70)";
+    sx.save();sx.translate(x2,BY);
+    sx.beginPath();sx.moveTo(0,0);sx.lineTo(20,0);sx.lineTo(20+BH,BH);sx.lineTo(BH,BH);
+    sx.closePath();sx.fill();sx.restore();si++;
   }
-  // Clip to rounded rect
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(BX+R,BY); ctx.lineTo(BX+BW-R,BY); ctx.quadraticCurveTo(BX+BW,BY,BX+BW,BY+R);
-  ctx.lineTo(BX+BW,BY+BH-R); ctx.quadraticCurveTo(BX+BW,BY+BH,BX+BW-R,BY+BH);
-  ctx.lineTo(BX+R,BY+BH); ctx.quadraticCurveTo(BX,BY+BH,BX,BY+BH-R);
-  ctx.lineTo(BX,BY+R); ctx.quadraticCurveTo(BX,BY,BX+R,BY);
-  ctx.closePath(); ctx.clip();
-  ctx.drawImage(stripeCanvas, 0, 0, W, H);
+  ctx.moveTo(BX+R,BY);ctx.lineTo(BX+BW-R,BY);ctx.quadraticCurveTo(BX+BW,BY,BX+BW,BY+R);
+  ctx.lineTo(BX+BW,BY+BH-R);ctx.quadraticCurveTo(BX+BW,BY+BH,BX+BW-R,BY+BH);
+  ctx.lineTo(BX+R,BY+BH);ctx.quadraticCurveTo(BX,BY+BH,BX,BY+BH-R);
+  ctx.lineTo(BX,BY+R);ctx.quadraticCurveTo(BX,BY,BX+R,BY);
+  ctx.closePath();ctx.clip();
+  ctx.drawImage(sc,0,0,W,H);
   ctx.restore();
-
-  // Inner border
-  rr(BX+3, BY+3, BW-6, BH-6, R-2, null, "rgba(180,100,5,0.8)", 2);
-
-  // CTA text — measure then center using actual metrics
-  let ctaSz = Math.max(28, Math.floor((BH-40)*0.72));
-  while (ctaSz > 20) {
-    ctx.font = `bold ${ctaSz}px 'Space Grotesk', sans-serif`;
-    if (ctx.measureText("Can you beat me?").width <= BW-64) break;
-    ctaSz -= 2;
-  }
-  ctx.font = `bold ${ctaSz}px 'Space Grotesk', sans-serif`;
-  const ctaM = ctx.measureText("Can you beat me?");
-  // actualBoundingBoxAscent/Descent give true pixel height
-  const ctaAscent  = ctaM.actualBoundingBoxAscent  || ctaSz * 0.72;
-  const ctaDescent = ctaM.actualBoundingBoxDescent || ctaSz * 0.18;
-  const ctaH_real  = ctaAscent + ctaDescent;
-  // Center: baseline y = BY + (BH + ctaAscent - ctaDescent) / 2
-  const ctaBaselineY = BY + Math.round((BH + ctaAscent - ctaDescent) / 2);
-  ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
-  ctx.fillText("Can you beat me?", W/2, ctaBaselineY);
-  ctx.textAlign = "left";
+  rr(BX+3,BY+3,BW-6,BH-6,R-2,null,"rgba(180,100,5,0.8)",2);
+  let ctaSz=Math.max(28,Math.floor((BH-40)*0.72));
+  while(ctaSz>20){ctx.font=`bold ${ctaSz}px 'Space Grotesk',sans-serif`;if(ctx.measureText("Can you beat me?").width<=BW-64)break;ctaSz-=2;}
+  ctx.font=`bold ${ctaSz}px 'Space Grotesk',sans-serif`;
+  const ctaM=ctx.measureText("Can you beat me?");
+  const ctaA=ctaM.actualBoundingBoxAscent||ctaSz*0.72;
+  const ctaD=ctaM.actualBoundingBoxDescent||ctaSz*0.18;
+  ctx.fillStyle="#F5F0E8";ctx.textAlign="center";
+  ctx.fillText("Can you beat me?",W/2,BY+Math.round((BH+ctaA-ctaD)/2));
+  ctx.textAlign="left";
 
   return canvas.toDataURL("image/png");
 }
@@ -708,29 +670,39 @@ function buildRound(allQuestions) {
       .slice(0, 7 - round.length).forEach(q => round.push(q));
   }
 
-  const round_shuffled = shuffle(round);
-
   // Enforce: max 1 Bible question, max 1 regional-religion question per round
   const ensureMax1 = (ids, arr) => {
     const matches = arr.filter(q => ids.has(q.id));
     if (matches.length <= 1) return arr;
-    // Keep the first match, replace the rest with non-matching questions
     let kept = false;
     return arr.map(q => {
       if (!ids.has(q.id)) return q;
       if (!kept) { kept = true; return q; }
-      // Find a replacement that's not already in the round and not in the banned set
       const roundIds = new Set(arr.map(r => r.id));
       const replacement = shuffle(available.filter(r =>
         !roundIds.has(r.id) && !ids.has(r.id) && r.category !== 'civics'
       ))[0];
-      return replacement || q; // fallback: keep original if no replacement
+      return replacement || q;
     });
   };
 
-  let result = round_shuffled;
-  result = ensureMax1(BIBLE_IDS, result);
-  result = ensureMax1(REGIONAL_RELIGION_IDS, result);
+  let filtered = shuffle(round);
+  filtered = ensureMax1(BIBLE_IDS, filtered);
+  filtered = ensureMax1(REGIONAL_RELIGION_IDS, filtered);
+
+  // Place the two religion questions at fixed positions: 4th (index 3) and 7th (index 6)
+  const religionQs  = filtered.filter(q => q.category === 'religion');
+  const nonReligion = filtered.filter(q => q.category !== 'religion');
+  // nonReligion has 5 items; religion has 2
+  // Build ordered array: slots 0,1,2 → nonReligion[0..2], slot 3 → religion[0],
+  // slots 4,5 → nonReligion[3..4], slot 6 → religion[1]
+  const result = [
+    nonReligion[0], nonReligion[1], nonReligion[2],
+    religionQs[0],
+    nonReligion[3], nonReligion[4],
+    religionQs[1],
+  ].filter(Boolean);
+
   result.forEach(q => seenIds.add(q.id));
   return result;
 }
@@ -1239,7 +1211,7 @@ function ShareCard({ guesses, round, onClose }) {
   const handleSave = () => {
     setStatus("Saving…");
     const dataUrl = drawShareCanvas(avg, guesses, round);
-    downloadDataUrl(dataUrl, "knowtient-score.png");
+    downloadDataUrl(dataUrl, "Knowtient Game Score.png");
     setStatus("Saved!");
   };
 
@@ -1247,7 +1219,7 @@ function ShareCard({ guesses, round, onClose }) {
     setStatus("Preparing…");
     try {
       const dataUrl = drawShareCanvas(avg, guesses, round);
-      const file    = dataUrlToFile(dataUrl, "knowtient-score.png");
+      const file    = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], text: shareText });
         setStatus("Shared!");
@@ -1299,15 +1271,15 @@ const TOTAL = 7;
 
 export default function App() {
   useEffect(() => {
-    document.title = "Knowtient — What % of Americans knew that?";
+    document.title = "Knowtient — Guess What % of Americans Knew";
     const sm = (prop, content, isName=false) => {
       const sel = isName ? `meta[name="${prop}"]` : `meta[property="${prop}"]`;
       let el = document.querySelector(sel);
       if (!el) { el = document.createElement("meta"); isName ? el.setAttribute("name",prop) : el.setAttribute("property",prop); document.head.appendChild(el); }
       el.setAttribute("content", content);
     };
-    const desc = "Seven real questions that Pew Research already asked thousands of Americans. Can you guess what % of Americans got each question right?";
-    const title = "Knowtient — What % of Americans knew that?";
+    const desc = "Guess what % of Americans knew the answers to seven common questions. Real Pew Research data. How close can you get?";
+    const title = "Knowtient — Guess What % of Americans Knew";
     sm("description", desc, true);
     sm("og:title", title); sm("og:description", desc);
     sm("og:image", "https://knowtient.com/og-image.png");
