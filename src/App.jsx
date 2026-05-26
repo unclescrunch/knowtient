@@ -431,7 +431,7 @@ const GlobalStyles = () => (
     .reveal-screen { display:flex; flex-direction:column; min-height:100%; }
     .reveal-top-label { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); text-align:center; margin-bottom:8px; margin-top:4px; }
     .reveal-big-number-wrap { display:flex; justify-content:center; margin-bottom:4px; }
-    .reveal-bar-section { margin-bottom:0; min-height:80px; }
+    .reveal-bar-section { margin-bottom:0; min-height:72px; }
     .reveal-bar-track { position:relative; height:12px; background:var(--color-border); border-radius:6px; }
     .reveal-bar-fill { height:100%; border-radius:6px; transition:width 1.4s cubic-bezier(0.34,1.4,0.64,1); }
     .reveal-bar-fill::after { content:''; position:absolute; top:0; left:-60%; width:60%; height:100%; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.5) 50%,transparent 100%); border-radius:6px; opacity:0; }
@@ -440,7 +440,7 @@ const GlobalStyles = () => (
     .reveal-guess-marker { position:absolute; top:-10px; width:5px; height:32px; background:var(--color-neon-cyan); border-radius:3px; box-shadow:0 0 10px var(--color-neon-cyan),0 0 20px rgba(0,240,255,0.4); }
     .reveal-guess-marker-label { position:absolute; top:30px; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--color-neon-cyan); white-space:nowrap; text-shadow:0 0 10px rgba(0,240,255,0.5); }
     /* delta row pushed down to clear the marker label (which needs ~60px below bar) */
-    .reveal-delta-row { text-align:center; margin-top:32px; margin-bottom:5px; }
+    .reveal-delta-row { text-align:center; margin-top:18px; margin-bottom:4px; }
     .reveal-delta-number { font-family:'DM Mono',monospace; font-size:24px; font-weight:500; }
     .reveal-delta-number.green { color:var(--color-neon-lime); text-shadow:0 0 12px rgba(198,255,0,0.5); }
     .reveal-delta-number.amber { color:var(--color-amber); text-shadow:0 0 12px rgba(245,166,35,0.4); }
@@ -1130,7 +1130,7 @@ function DebriefModal({ round, guesses, onClose }) {
 }
 
 // ─── END SCREEN ───────────────────────────────────────────────────────────────
-function EndScreen({ round, guesses, onPlayAgain, onShare }) {
+function EndScreen({ round, guesses, onPlayAgain, onShare, avg }) {
   const avg = avgDeviation(guesses);
   const [run, setRun]               = useState(false);
   const [showDebrief, setShowDebrief] = useState(false);
@@ -1196,7 +1196,23 @@ function EndScreen({ round, guesses, onPlayAgain, onShare }) {
             </div>
             <div className="end-ctas">
               <button className="btn-primary"   onClick={onPlayAgain}>PLAY AGAIN</button>
-              <button className="btn-secondary" onClick={onShare}>SHARE</button>
+              {isMobile() ? (
+                <button className="btn-secondary" onClick={async () => {
+                  const avgVal = avg || 0;
+                  const txt = `Seven common questions. Thousands of Americans surveyed. Guess what % knew the right answers. My average guess was off by ${avgVal.toFixed(1)}%. www.Knowtient.com`;
+                  try {
+                    const dataUrl = drawShareCanvas(avgVal, guesses, round);
+                    const file = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
+                    if (navigator.share && navigator.canShare({ files: [file] })) {
+                      await navigator.share({ files: [file], text: txt });
+                    } else if (navigator.share) {
+                      await navigator.share({ text: txt });
+                    }
+                  } catch(e) { if (e.name !== "AbortError") console.warn(e); }
+                }}>SHARE</button>
+              ) : (
+                <button className="btn-secondary" onClick={onShare}>SAVE RESULTS</button>
+              )}
               <button className="btn-secondary" onClick={() => setShowDebrief(true)}>VIEW FULL DEBRIEF</button>
             </div>
           </div>
@@ -1207,112 +1223,41 @@ function EndScreen({ round, guesses, onPlayAgain, onShare }) {
   );
 }
 
-// ─── SHARE CARD ───────────────────────────────────────────────────────────────
+// ─── SHARE CARD (desktop: preview + SAVE RESULTS) ───────────────────────────
 function ShareCard({ guesses, round, onClose }) {
-  const avg       = avgDeviation(guesses);
-  const mobile    = isMobile();
-  const shareText = `What is your Knowtient? Guess what % of Americans knew the answers to seven common questions. My avg was ${avg.toFixed(1)} pts off. Knowtient.com`;
-  const [status, setStatus] = useState("");
+  const avg = avgDeviation(guesses);
+  const [status,  setStatus]  = useState("");
   const [preview, setPreview] = useState(null);
 
-  // Generate preview on mount
   useEffect(() => {
-    const url = drawShareCanvas(avg, guesses, round);
-    setPreview(url);
+    setPreview(drawShareCanvas(avg, guesses, round));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = () => {
-    setStatus("Saving…");
-    const dataUrl = drawShareCanvas(avg, guesses, round);
-    downloadDataUrl(dataUrl, "Knowtient Game Score.png");
+    downloadDataUrl(drawShareCanvas(avg, guesses, round), "Knowtient Game Score.png");
     setStatus("Saved!");
-  };
-
-  const handleShare = async () => {
-    setStatus("Preparing…");
-    try {
-      const dataUrl = drawShareCanvas(avg, guesses, round);
-      const file    = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: shareText });
-        setStatus("Shared!");
-      } else {
-        await navigator.share({ text: shareText });
-        setStatus("Shared!");
-      }
-    } catch (e) {
-      if (e.name !== "AbortError") setStatus("Couldn't share — try Save instead.");
-    }
-  };
-
-  const [prevPlat, setPrevPlat] = useState(null);
-
-  const handleDesktopPlatform = (p) => {
-    const dataUrl = drawShareCanvas(avg, guesses, round);
-    setPrevPlat(p.id);
-    downloadDataUrl(dataUrl, p.filename);
-    setTimeout(() => window.open(p.url, "_blank", "noopener"), 300);
-    setStatus(`${p.label} image saved — post it!`);
   };
 
   return (
     <div className="share-overlay" onClick={onClose}>
       <div className="share-card" onClick={e => e.stopPropagation()}>
-
-        {/* Preview */}
-        <div style={{
-          width:"100%", borderRadius:12, overflow:"hidden",
-          marginBottom:14, background:"#1a1840",
-          border:"2px solid var(--color-border)",
-          minHeight:160, maxHeight:340, display:"flex", alignItems:"center", justifyContent:"center",
-        }}>
+        <div style={{width:"100%",borderRadius:12,overflow:"hidden",marginBottom:16,background:"#1a1840",border:"2px solid var(--color-border)",minHeight:160,maxHeight:340,display:"flex",alignItems:"center",justifyContent:"center"}}>
           {preview
             ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:336}} />
             : <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)",padding:24,textAlign:"center"}}>Generating…</span>
           }
         </div>
-
-        {mobile ? (
-          /* ── MOBILE: SHARE only (SHARE already handles save-to-camera-roll via share sheet) ── */
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-            <button className="btn-primary" onClick={handleShare}>SHARE →</button>
-          </div>
-        ) : (
-          /* ── DESKTOP: 4 platform icons + SAVE RESULTS ── */
-          <>
-            <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:12}}>
-              {PLATFORMS.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => handleDesktopPlatform(p)}
-                  title={p.label}
-                  style={{
-                    background: prevPlat===p.id ? "rgba(245,166,35,0.18)" : "var(--color-base)",
-                    border:`2px solid ${prevPlat===p.id ? "var(--color-amber)" : "var(--color-border)"}`,
-                    borderRadius:12, width:56, height:56,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    cursor:"pointer", padding:12,
-                    transition:"border-color 0.15s, background 0.15s",
-                  }}
-                  dangerouslySetInnerHTML={{__html: PLATFORM_ICONS[p.svgKey]}}
-                />
-              ))}
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-              <button className="btn-secondary" onClick={handleSave}>SAVE RESULTS</button>
-            </div>
-          </>
-        )}
-
-        {status && <div className="share-status">{status}</div>}
-        <div style={{marginTop:8}}>
+        {status && <div className="share-status" style={{marginBottom:8}}>{status}</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button className="btn-primary" onClick={handleSave}>SAVE RESULTS</button>
           <button className="btn-secondary" onClick={onClose}>CLOSE</button>
         </div>
       </div>
     </div>
   );
 }
+
 
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 const TOTAL = 7;
@@ -1416,10 +1361,10 @@ export default function App() {
             <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} />
           )}
           {screen === "end" && (
-            <EndScreen round={round} guesses={guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} />
+            <EndScreen round={round} guesses={guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(guesses)} />
           )}
         </div>
-        {showShare && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} />}
+        {showShare && !isMobile() && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} />}
       </div>
     </>
   );
