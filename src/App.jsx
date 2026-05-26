@@ -1347,7 +1347,7 @@ export default function App() {
       <div className="app-shell">
         {showTitleBar && (
           <div className="app-title-bar">
-            <span className="app-title-bar-text"><span className="kt-know">KNOW</span><span className="kt-tient">TIENT</span></span>
+            <span className="app-title-bar-text"><span className="kt-know">KNOW</span><span className="kt-tient">TIENT</span></span> 
           </div>
         )}
         <ProgressBar current={qIndex} total={TOTAL} show={showProgress} />
