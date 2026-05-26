@@ -326,11 +326,19 @@ const PLATFORM_ICONS = {
 };
 
 // Platform configs
+const ENCODED_URL = encodeURIComponent("https://knowtient.com");
+const ENCODED_TITLE = encodeURIComponent("Knowtient — Guess What % of Americans Knew");
+const ENCODED_DESC  = encodeURIComponent("Guess what % of Americans knew the answers to seven common questions. Real Pew Research data.");
+
 const PLATFORMS = [
-  { id:"linkedin", label:"LinkedIn",  w:1080, h:1350, filename:"knowtient-linkedin.png",  url:"https://www.linkedin.com/sharing/share-offsite/?url=https://knowtient.com", svgKey:"linkedin" },
-  { id:"ig",       label:"Instagram", w:1080, h:1920, filename:"knowtient-instagram.png", url:"https://www.instagram.com/",              svgKey:"ig" },
-  { id:"tiktok",   label:"TikTok",    w:1080, h:1920, filename:"knowtient-tiktok.png",    url:"https://www.tiktok.com/upload",           svgKey:"tiktok" },
-  { id:"fb",       label:"Facebook",  w:1080, h:1920, filename:"knowtient-facebook.png",  url:"https://www.facebook.com/",              svgKey:"fb" },
+  { id:"linkedin", label:"LinkedIn",  filename:"Knowtient Game Score.png",
+    url:`https://www.linkedin.com/sharing/share-offsite/?url=${ENCODED_URL}`, svgKey:"linkedin" },
+  { id:"ig",       label:"Instagram", filename:"Knowtient Game Score.png",
+    url:"https://www.instagram.com/",              svgKey:"ig" },
+  { id:"tiktok",   label:"TikTok",    filename:"Knowtient Game Score.png",
+    url:"https://www.tiktok.com/upload",           svgKey:"tiktok" },
+  { id:"fb",       label:"Facebook",  filename:"Knowtient Game Score.png",
+    url:`https://www.facebook.com/sharer/sharer.php?u=${ENCODED_URL}&quote=${ENCODED_DESC}`, svgKey:"fb" },
 ];
 
 const GlobalStyles = () => (
@@ -423,7 +431,7 @@ const GlobalStyles = () => (
     .reveal-screen { display:flex; flex-direction:column; min-height:100%; }
     .reveal-top-label { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-secondary); text-align:center; margin-bottom:8px; margin-top:4px; }
     .reveal-big-number-wrap { display:flex; justify-content:center; margin-bottom:4px; }
-    .reveal-bar-section { margin-bottom:0; min-height:110px; }
+    .reveal-bar-section { margin-bottom:0; min-height:80px; }
     .reveal-bar-track { position:relative; height:12px; background:var(--color-border); border-radius:6px; }
     .reveal-bar-fill { height:100%; border-radius:6px; transition:width 1.4s cubic-bezier(0.34,1.4,0.64,1); }
     .reveal-bar-fill::after { content:''; position:absolute; top:0; left:-60%; width:60%; height:100%; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.5) 50%,transparent 100%); border-radius:6px; opacity:0; }
@@ -432,7 +440,7 @@ const GlobalStyles = () => (
     .reveal-guess-marker { position:absolute; top:-10px; width:5px; height:32px; background:var(--color-neon-cyan); border-radius:3px; box-shadow:0 0 10px var(--color-neon-cyan),0 0 20px rgba(0,240,255,0.4); }
     .reveal-guess-marker-label { position:absolute; top:30px; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:22px; font-weight:500; color:var(--color-neon-cyan); white-space:nowrap; text-shadow:0 0 10px rgba(0,240,255,0.5); }
     /* delta row pushed down to clear the marker label (which needs ~60px below bar) */
-    .reveal-delta-row { text-align:center; margin-top:70px; margin-bottom:5px; }
+    .reveal-delta-row { text-align:center; margin-top:32px; margin-bottom:5px; }
     .reveal-delta-number { font-family:'DM Mono',monospace; font-size:24px; font-weight:500; }
     .reveal-delta-number.green { color:var(--color-neon-lime); text-shadow:0 0 12px rgba(198,255,0,0.5); }
     .reveal-delta-number.amber { color:var(--color-amber); text-shadow:0 0 12px rgba(245,166,35,0.4); }
@@ -1238,50 +1246,64 @@ function ShareCard({ guesses, round, onClose }) {
     }
   };
 
+  const [prevPlat, setPrevPlat] = useState(null);
+
+  const handleDesktopPlatform = (p) => {
+    const dataUrl = drawShareCanvas(avg, guesses, round);
+    setPrevPlat(p.id);
+    downloadDataUrl(dataUrl, p.filename);
+    setTimeout(() => window.open(p.url, "_blank", "noopener"), 300);
+    setStatus(`${p.label} image saved — post it!`);
+  };
+
   return (
     <div className="share-overlay" onClick={onClose}>
       <div className="share-card" onClick={e => e.stopPropagation()}>
 
-        {/* Preview — shown on all devices */}
+        {/* Preview */}
         <div style={{
           width:"100%", borderRadius:12, overflow:"hidden",
-          marginBottom:16, background:"#1a1840",
+          marginBottom:14, background:"#1a1840",
           border:"2px solid var(--color-border)",
-          minHeight:180, maxHeight:360, display:"flex", alignItems:"center", justifyContent:"center",
+          minHeight:160, maxHeight:340, display:"flex", alignItems:"center", justifyContent:"center",
         }}>
           {preview
-            ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:356}} />
+            ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:336}} />
             : <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)",padding:24,textAlign:"center"}}>Generating…</span>
           }
         </div>
 
-        {/* Actions — SHARE on mobile, SAVE on all devices */}
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-          {mobile && (
+        {mobile ? (
+          /* ── MOBILE: SHARE only (SHARE already handles save-to-camera-roll via share sheet) ── */
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
             <button className="btn-primary" onClick={handleShare}>SHARE →</button>
-          )}
-          <button className="btn-secondary" onClick={async () => {
-            if (mobile) {
-              // Mobile: use Web Share API so user can save to camera roll
-              setStatus("Preparing…");
-              try {
-                const dataUrl = drawShareCanvas(avg, guesses, round);
-                const file = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
-                if (navigator.share && navigator.canShare({ files: [file] })) {
-                  await navigator.share({ files: [file] });
-                  setStatus("Saved!");
-                } else {
-                  downloadDataUrl(dataUrl, "Knowtient Game Score.png");
-                  setStatus("Saved to downloads!");
-                }
-              } catch (e) {
-                if (e.name !== "AbortError") setStatus("Couldn't save — try screenshot.");
-              }
-            } else {
-              handleSave();
-            }
-          }}>SAVE RESULTS</button>
-        </div>
+          </div>
+        ) : (
+          /* ── DESKTOP: 4 platform icons + SAVE RESULTS ── */
+          <>
+            <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:12}}>
+              {PLATFORMS.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleDesktopPlatform(p)}
+                  title={p.label}
+                  style={{
+                    background: prevPlat===p.id ? "rgba(245,166,35,0.18)" : "var(--color-base)",
+                    border:`2px solid ${prevPlat===p.id ? "var(--color-amber)" : "var(--color-border)"}`,
+                    borderRadius:12, width:56, height:56,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    cursor:"pointer", padding:12,
+                    transition:"border-color 0.15s, background 0.15s",
+                  }}
+                  dangerouslySetInnerHTML={{__html: PLATFORM_ICONS[p.svgKey]}}
+                />
+              ))}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+              <button className="btn-secondary" onClick={handleSave}>SAVE RESULTS</button>
+            </div>
+          </>
+        )}
 
         {status && <div className="share-status">{status}</div>}
         <div style={{marginTop:8}}>
@@ -1331,6 +1353,7 @@ export default function App() {
       if (document.activeElement && document.activeElement.tagName === "INPUT") return;
       if (screen === "splash")   document.querySelector(".btn-primary")?.click();
       if (screen === "question") document.querySelector(".btn-primary:not(:disabled)")?.click();
+      if (screen === "reveal")   document.querySelector(".btn-primary.large")?.click();
       if (screen === "end")      document.querySelector(".btn-primary")?.click();
       if (screen === "title")    document.querySelector(".title-begin-btn.visible")?.click();
     };
