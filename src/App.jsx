@@ -1255,12 +1255,32 @@ function ShareCard({ guesses, round, onClose }) {
           }
         </div>
 
-        {/* Actions */}
+        {/* Actions — SHARE on mobile, SAVE on all devices */}
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           {mobile && (
             <button className="btn-primary" onClick={handleShare}>SHARE →</button>
           )}
-          <button className="btn-secondary" onClick={handleSave}>SAVE RESULTS</button>
+          <button className="btn-secondary" onClick={async () => {
+            if (mobile) {
+              // Mobile: use Web Share API so user can save to camera roll
+              setStatus("Preparing…");
+              try {
+                const dataUrl = drawShareCanvas(avg, guesses, round);
+                const file = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
+                if (navigator.share && navigator.canShare({ files: [file] })) {
+                  await navigator.share({ files: [file] });
+                  setStatus("Saved!");
+                } else {
+                  downloadDataUrl(dataUrl, "Knowtient Game Score.png");
+                  setStatus("Saved to downloads!");
+                }
+              } catch (e) {
+                if (e.name !== "AbortError") setStatus("Couldn't save — try screenshot.");
+              }
+            } else {
+              handleSave();
+            }
+          }}>SAVE RESULTS</button>
         </div>
 
         {status && <div className="share-status">{status}</div>}
@@ -1290,6 +1310,7 @@ export default function App() {
     sm("og:title", title); sm("og:description", desc);
     sm("og:image", "https://knowtient.com/og-image.png");
     sm("og:url", "https://knowtient.com"); sm("og:type", "website");
+    sm("og:site_name", "Knowtient");
     sm("twitter:card", "summary_large_image", true);
     sm("twitter:title", title, true); sm("twitter:description", desc, true);
     sm("twitter:image", "https://knowtient.com/og-image.png", true);
@@ -1302,6 +1323,20 @@ export default function App() {
   const [showShare, setShowShare] = useState(false);
   const [qAnim,     setQAnim]     = useState("screen-enter");
   const questions = questionsData.questions;
+
+  // Enter key fires primary action for current screen
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key !== "Enter") return;
+      if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+      if (screen === "splash")   document.querySelector(".btn-primary")?.click();
+      if (screen === "question") document.querySelector(".btn-primary:not(:disabled)")?.click();
+      if (screen === "end")      document.querySelector(".btn-primary")?.click();
+      if (screen === "title")    document.querySelector(".title-begin-btn.visible")?.click();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [screen]);
 
   const startRound = useCallback(() => {
     // Resume audio context on each new round (mobile browsers suspend it)
