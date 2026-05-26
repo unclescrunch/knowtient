@@ -221,12 +221,18 @@ function drawShareCanvas(avg, guesses, round) {
   const TAG_H=42,Q_H=qLines.length*(qSz+7)+8,A_H=aLines.length*(aSz+6)+10,NUM_H=156;
   const card_h=PIN+TAG_H+Q_H+A_H+NUM_H+PIN;
 
-  // ── Gap distribution ──
-  const fixed_h=LOGO_END+LH*2+card_h+LH+146+108;
-  const gap=Math.max(8,Math.floor((H-28-fixed_h)/6));
+  // ── Fixed minimum gaps — no overlap ever ──
+  // Reserve space from bottom: CTA(108) + avg_block(LH+16+138) + card + tagline + logo
+  // Place CTA at bottom, work upward to find card position
+  const CTA_H_VAL=108, AVG_BLOCK=LH+16+138, MIN_GAP=20;
+  // Total content height
+  const content_h = LOGO_END + MIN_GAP + LH*2 + MIN_GAP + card_h + MIN_GAP + AVG_BLOCK + MIN_GAP + CTA_H_VAL;
+  // If content fits, distribute extra space as padding; if not, use min gaps
+  const spare = H - 28 - content_h;
+  const gap = spare > 0 ? Math.floor(spare/5) + MIN_GAP : MIN_GAP;
 
   // ── Draw ──
-  let y=LOGO_END+gap;
+  let y = LOGO_END + gap;
 
   // Tagline
   ctr(L1,BF,W/2,y,"#F5F0E8");y+=LH;
@@ -250,14 +256,14 @@ function drawShareCanvas(avg, guesses, round) {
   ctx.textAlign="left";
   y+=card_h+gap;
 
-  // Avg intro + big number
-  ctr(INTRO,BF,W/2,y,"#C8C3B8");y+=LH+Math.floor(gap/3);
+  // Avg intro + big number — guaranteed below card
+  ctr(INTRO,BF,W/2,y,"#C8C3B8");y+=LH+16;
   ctx.font=`bold 130px 'Space Grotesk',sans-serif`;
   const avgStr=`${avg.toFixed(1)}%`;
   const aw=ctx.measureText(avgStr).width,nx=Math.round((W-aw)/2);
   ctx.fillStyle="#E8634A";ctx.fillText(avgStr,nx+8,y+8);
   ctx.fillStyle="#F5A623";ctx.fillText(avgStr,nx,y);
-  y+=130+gap;
+  y+=138+gap;
 
   // CTA — alternating stripes
   const BX=PAD,BY=y,BW=IW,BH=108,R=14;
