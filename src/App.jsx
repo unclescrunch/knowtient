@@ -1130,8 +1130,8 @@ function DebriefModal({ round, guesses, onClose }) {
 }
 
 // ─── END SCREEN ───────────────────────────────────────────────────────────────
-function EndScreen({ round, guesses, onPlayAgain, onShare, avg }) {
-  const avg = avgDeviation(guesses);
+function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp }) {
+  const avg = avgProp ?? avgDeviation(guesses);
   const [run, setRun]               = useState(false);
   const [showDebrief, setShowDebrief] = useState(false);
   const displayed = useCountUp(parseFloat(avg.toFixed(1)), 1200, run);
