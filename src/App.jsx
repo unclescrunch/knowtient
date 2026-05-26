@@ -15,31 +15,26 @@ function getAudioCtx() {
   if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
-let lastTickTime = -1;
 function playTick(value) {
   try {
     const ctx = getAudioCtx();
     const now = ctx.currentTime;
-    if (now - lastTickTime < 0.035) return; // 35ms gap — no overlapping oscillators
-    lastTickTime = now;
     const t = value / 100;
-    const freq = 60 + t * 380; // 60→440Hz
-    // Fundamental
+    const freq = 110 + t * 754; // 110→864Hz
+    // Fundamental: sine, 40ms decay
     const o1 = ctx.createOscillator(), g1 = ctx.createGain();
     o1.connect(g1); g1.connect(ctx.destination);
     o1.type = "sine"; o1.frequency.setValueAtTime(freq, now);
-    g1.gain.setValueAtTime(0.0001, now);
-    g1.gain.linearRampToValueAtTime(0.13, now + 0.005);
-    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-    o1.start(now); o1.stop(now + 0.065);
-    // 4th harmonic — decays faster, adds marimba character
+    g1.gain.setValueAtTime(0.07, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    o1.start(now); o1.stop(now + 0.04);
+    // 2x octave harmonic at 15% volume, decays in 20ms
     const o2 = ctx.createOscillator(), g2 = ctx.createGain();
     o2.connect(g2); g2.connect(ctx.destination);
-    o2.type = "sine"; o2.frequency.setValueAtTime(freq * 4, now);
-    g2.gain.setValueAtTime(0.0001, now);
-    g2.gain.linearRampToValueAtTime(0.016, now + 0.003);
-    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-    o2.start(now); o2.stop(now + 0.065);
+    o2.type = "sine"; o2.frequency.setValueAtTime(freq * 2, now);
+    g2.gain.setValueAtTime(0.07 * 0.15, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+    o2.start(now); o2.stop(now + 0.02);
   } catch {}
 }
 function playSelect(value) {
@@ -971,7 +966,7 @@ shuffledChoices.current = moveToEnd(shuffled);
     if (!moved) setMoved(true);
     if (Math.abs(v - lastTickRef.current) >= 1) { playTick(v); lastTickRef.current = v; }
   };
-  const handleRelease = () => { if (moved) playSelect(value); };
+  const handleRelease = () => {};  // submit sound only fires on button click
 
   const bgR = Math.round(45 + (value/100)*60);
   const bgG = Math.round(42 + (value/100)*20);
