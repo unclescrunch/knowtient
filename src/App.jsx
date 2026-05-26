@@ -15,33 +15,57 @@ function getAudioCtx() {
   if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
+let lastTickTime = -1;
 function playTick(value) {
   try {
     const ctx = getAudioCtx();
-    const osc = ctx.createOscillator(); const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination); osc.type = "sine";
-    osc.frequency.setValueAtTime(180 + (value / 100) * 720, ctx.currentTime);
-    gain.gain.setValueAtTime(0.07, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.04);
+    const now = ctx.currentTime;
+    if (now - lastTickTime < 0.035) return; // 35ms gap — no overlapping oscillators
+    lastTickTime = now;
+    const t = value / 100;
+    const freq = 60 + t * 380; // 60→440Hz
+    // Fundamental
+    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.type = "sine"; o1.frequency.setValueAtTime(freq, now);
+    g1.gain.setValueAtTime(0.0001, now);
+    g1.gain.linearRampToValueAtTime(0.13, now + 0.005);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    o1.start(now); o1.stop(now + 0.065);
+    // 4th harmonic — decays faster, adds marimba character
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.type = "sine"; o2.frequency.setValueAtTime(freq * 4, now);
+    g2.gain.setValueAtTime(0.0001, now);
+    g2.gain.linearRampToValueAtTime(0.016, now + 0.003);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+    o2.start(now); o2.stop(now + 0.065);
   } catch {}
 }
 function playSelect(value) {
   try {
     const ctx = getAudioCtx();
-    const osc = ctx.createOscillator(); const g1 = ctx.createGain();
-    osc.connect(g1); g1.connect(ctx.destination); osc.type = "sine";
-    osc.frequency.setValueAtTime(90, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.12);
-    g1.gain.setValueAtTime(0.28, ctx.currentTime);
-    g1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
-    const osc2 = ctx.createOscillator(); const g2 = ctx.createGain();
-    osc2.connect(g2); g2.connect(ctx.destination); osc2.type = "square";
-    osc2.frequency.setValueAtTime(400 + value * 3, ctx.currentTime);
-    g2.gain.setValueAtTime(0.06, ctx.currentTime);
-    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-    osc2.start(ctx.currentTime); osc2.stop(ctx.currentTime + 0.06);
+    const now = ctx.currentTime;
+    const t = value / 100;
+    // Sound B — warm double tap, pitch informed by slider position
+    // First pop: maps slider to 160→400Hz
+    const freq1 = 160 + t * 240;
+    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.type = "sine"; o1.frequency.setValueAtTime(freq1, now);
+    g1.gain.setValueAtTime(0.0001, now);
+    g1.gain.linearRampToValueAtTime(0.20, now + 0.006);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+    o1.start(now); o1.stop(now + 0.10);
+    // Second pop: 70ms later, slightly higher pitch
+    const freq2 = freq1 * 1.3;
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.type = "sine"; o2.frequency.setValueAtTime(freq2, now + 0.07);
+    g2.gain.setValueAtTime(0.0001, now + 0.07);
+    g2.gain.linearRampToValueAtTime(0.16, now + 0.076);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+    o2.start(now + 0.07); o2.stop(now + 0.17);
   } catch {}
 }
 function playFanfare() {
@@ -749,7 +773,8 @@ function useCountUp(target, duration = 1400, run = false) {
     const start = performance.now();
     const tick = (now) => {
       const t = Math.min((now - start) / duration, 1);
-      setValue(Math.round((1 - Math.pow(1 - t, 3)) * target));
+      // Round to 1 decimal to match toFixed(1) display
+      setValue(Math.round((1 - Math.pow(1 - t, 3)) * target * 10) / 10);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
