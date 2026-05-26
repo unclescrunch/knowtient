@@ -99,30 +99,30 @@ function playEndChime() {
 }
 
 // ─── SHARE IMAGE GENERATOR ────────────────────────────────────────────────────
-// Two-pass layout: measure all content heights first, then scale to fit, then draw.
-// No ellipses. CTA always visible. Works at any aspect ratio.
-function drawShareCanvas(avg, guesses, round, width, height) {
+// Always 1080x1080. Used for all share/download on mobile and desktop.
+function drawShareCanvas(avg, guesses, round) {
+  const W = 1080, H = 1080;
   const canvas = document.createElement("canvas");
   const dpr = 2;
-  canvas.width  = width  * dpr;
-  canvas.height = height * dpr;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
 
-  const W = width, H = height;
-  const PAD = Math.round(W * 0.065);
-  const IW  = W - PAD * 2; // inner width
+  const PAD = 52, IW = W - PAD * 2;
 
-  // Background
+  // ── Background gradient ──
   const grad = ctx.createLinearGradient(0, 0, W, H);
   grad.addColorStop(0, "#2D2A5E"); grad.addColorStop(1, "#1a1840");
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+  // Subtle diagonal stripes
   ctx.save(); ctx.globalAlpha = 0.04; ctx.strokeStyle = "#C6FF00"; ctx.lineWidth = 1;
-  for (let x = -H; x < W+H; x += 28) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
+  for (let x = -H; x < W+H; x += 52) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
   ctx.restore();
 
   // ── Helpers ──
-  const rr = (x, y, w, h, r, fill, strokeCol, strokeW) => {
+  const rr = (x,y,w,h,r,fill,strokeCol,strokeW) => {
     ctx.beginPath();
     ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
     ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
@@ -132,211 +132,201 @@ function drawShareCanvas(avg, guesses, round, width, height) {
     if (fill) { ctx.fillStyle=fill; ctx.fill(); }
     if (strokeCol) { ctx.strokeStyle=strokeCol; ctx.lineWidth=strokeW||2; ctx.stroke(); }
   };
-
-  // Count how many lines text needs at given font+maxW
-  const countLines = (text, maxW) => {
-    const words = text.split(" "); let line="", n=0;
-    for (const w of words) {
-      const t = line ? line+" "+w : w;
-      if (ctx.measureText(t).width > maxW && line) { n++; line=w; } else line=t;
-    }
-    return n + (line ? 1 : 0);
+  const centeredText = (text, font, cx, y, fill) => {
+    ctx.font = font; ctx.fillStyle = fill; ctx.textAlign = "center";
+    ctx.fillText(text, cx, y); ctx.textAlign = "left";
   };
-
-  // Draw wrapped text left-aligned, return new Y
-  const drawW = (text, x, y, maxW, lineH) => {
-    const words = text.split(" "); let line="";
+  const wl = (text, font, mw) => {
+    ctx.font = font;
+    const words = text.split(" "); let line = "", lines = [];
     for (const w of words) {
       const t = line ? line+" "+w : w;
-      if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line,x,y); y+=lineH; line=w; } else line=t;
+      if (ctx.measureText(t).width > mw && line) { lines.push(line); line=w; } else line=t;
     }
-    if (line) { ctx.fillText(line,x,y); y+=lineH; }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const drawLeft = (lines, font, x, y, fill, lh) => {
+    ctx.font = font; ctx.fillStyle = fill; ctx.textAlign = "left";
+    lines.forEach(l => { ctx.fillText(l, x, y); y += lh; });
     return y;
   };
 
-  // Draw wrapped text center-aligned, return new Y
-  const drawWC = (text, cx, y, maxW, lineH) => {
-    const words = text.split(" "); let line="";
-    for (const w of words) {
-      const t = line ? line+" "+w : w;
-      if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line,cx,y); y+=lineH; line=w; } else line=t;
-    }
-    if (line) { ctx.fillText(line,cx,y); y+=lineH; }
-    return y;
-  };
+  // ── Logo fonts (78px KNOWTIENT, 28px .com) ──
+  // Use textMetrics to pixel-align baselines
+  const LSIZ = 78, CSIZ = 28;
+  ctx.font = `bold ${LSIZ}px 'Space Grotesk', sans-serif`;
+  const mK = ctx.measureText("KNOW");
+  const mT = ctx.measureText("TIENT");
+  ctx.font = `bold ${CSIZ}px 'Space Grotesk', sans-serif`;
+  const mC = ctx.measureText(".com");
 
-  // Shrink font until text fits in maxLines — returns pixel size
-  const fitFont = (text, startPx, fontStr, maxW, maxLines) => {
-    let sz = startPx;
-    while (sz > 12) {
-      ctx.font = fontStr.replace("$", sz);
-      if (countLines(text, maxW) <= maxLines) break;
-      sz = Math.max(12, sz - Math.max(1, Math.round(sz * 0.07)));
-    }
-    return sz;
-  };
+  const kw = mK.width, tw = mT.width, cw = mC.width;
+  const lx = (W - (kw+6+tw+5+cw)) / 2;
+  const txPos = lx+kw+6, comxPos = txPos+tw+5;
 
-  // ── Data ──
+  // TIENT top at y=28 → TIENT baseline = 28 + LSIZ (approx ascent = font size for canvas)
+  const TIENT_BL = 28 + LSIZ;
+  const KNOW_BL  = TIENT_BL + 10;
+  // .com bottom aligns with KNOW bottom: KNOW bottom ≈ KNOW_BL + LSIZ*0.22
+  // .com bottom ≈ COM_BL + CSIZ*0.22 → COM_BL = (KNOW_BL + LSIZ*0.22) - CSIZ*0.22
+  const COM_BL   = (KNOW_BL + Math.round(LSIZ*0.22)) - Math.round(CSIZ*0.22);
+  const LOGO_BOTTOM = KNOW_BL + Math.round(LSIZ*0.22) + 6;
+
+  const logoWord = (text, sz, bx, bl, sdx, sdy) => {
+    const font = `bold ${sz}px 'Space Grotesk', sans-serif`;
+    ctx.font = font; ctx.textAlign = "left";
+    ctx.fillStyle = "#00C8DC"; ctx.fillText(text, bx+sdx, bl+sdy);
+    ctx.fillStyle = "#0F4619"; ctx.fillText(text, bx+2, bl+2);
+    ctx.fillStyle = "#C6FF00"; ctx.fillText(text, bx, bl);
+  };
+  logoWord("KNOW",  LSIZ, lx,      KNOW_BL,  5, 5);
+  logoWord("TIENT", LSIZ, txPos,   TIENT_BL, 5, 5);
+  logoWord(".com",  CSIZ, comxPos, COM_BL,   3, 3);
+
+  // ── Body font: find largest size where longest line fits IW ──
+  const LINE1 = "Guess what % of Americans knew the answers to";
+  const LINE2 = "seven common questions.";
+  const INTRO = "My average guess was off by:";
+  let bodyFontSz = 30;
+  while (bodyFontSz > 16) {
+    ctx.font = `bold ${bodyFontSz}px 'Space Grotesk', sans-serif`;
+    if (Math.max(ctx.measureText(LINE1).width, ctx.measureText(INTRO).width) <= IW) break;
+    bodyFontSz--;
+  }
+  const BODY_FONT = `bold ${bodyFontSz}px 'Space Grotesk', sans-serif`;
+  const LH = bodyFontSz + 8;
+
+  // ── Card measurements ──
+  const f_q = `bold 24px 'Space Grotesk', sans-serif`;
+  const f_a = `22px 'Space Grotesk', sans-serif`;
+  const f_n = `bold 72px 'Space Grotesk', sans-serif`;
+  const f_l = `bold 17px 'Space Grotesk', sans-serif`;
+  const PIN = 22, ICW = IW - PIN*2;
+  const TAG_H_C = 22+10;
+
   const withD = (round && round.length)
     ? round.map((q,i) => ({ q, g:guesses[i], delta:guesses[i]?Math.abs(guesses[i].guess-q.pct_correct):999 }))
     : [];
-  const best  = withD.length ? [...withD].sort((a,b)=>a.delta-b.delta)[0]  : null;
-  const worst = withD.length ? [...withD].sort((a,b)=>b.delta-a.delta)[0] : null;
+  const best = withD.length ? [...withD].sort((a,b)=>a.delta-b.delta)[0] : null;
 
-  // ── PASS 1: measure total content at base scale ──
-  // Base scale: W/1080 so fonts are proportional to canvas width
-  const S = W / 1080;
-  const px = n => Math.round(n * S); // base pixel size
+  const cardQ = best ? best.q.question : "—";
+  const cardA = best ? `Correct answer: ${best.q.correct_answer}` : "—";
+  const cardReal = best ? best.q.pct_correct : 0;
+  const cardMy   = best && best.g ? best.g.guess : 0;
 
-  // Header block heights (fixed)
-  const LOGO_H    = px(110);  // KNOWTIENT logo
-  const SUB_H     = px(60);   // subhead line
-  const INTRO_H   = px(50);   // avg intro line
-  const NUM_H     = px(200);  // big number
-  const CARD_GAP  = px(18);
-  const CTA_MIN_H = px(130);  // minimum CTA height
-  const CTA_PAD   = px(24);   // space before CTA
-  const V_PAD     = px(50);   // top/bottom canvas padding
+  ctx.font = f_q;
+  const qLines = wl(cardQ, f_q, ICW);
+  const Q_H = qLines.length * 30 + 8;
+  ctx.font = f_a;
+  const aLines = wl(cardA, f_a, ICW);
+  const A_H = aLines.length * 27 + 10;
+  const NUM_H_C = 76+24+10;
+  const card_h = PIN+TAG_H_C+Q_H+A_H+NUM_H_C+PIN;
 
-  // Measure one card's height
-  const measureCard = (item) => {
-    if (!item) return 0;
-    const cardIW = IW - px(36);
-    // Tag
-    const tagH = px(26) + px(20);  // matches drawCard: tagFontSz + gap
-    // Question: fit to 4 lines max
-    const qSz  = fitFont(item.q.question, px(36), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
-    ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
-    const qH   = countLines(item.q.question, cardIW) * Math.round(qSz * 1.4);
-    // Answer: fit to 4 lines max, full text no truncation
-    const ansT = `Correct answer: ${item.q.correct_answer}`;
-    const aSz  = fitFont(ansT, px(30), "$px 'Space Grotesk',sans-serif", cardIW, 4);
-    ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
-    const aH   = countLines(ansT, cardIW) * Math.round(aSz * 1.4);
-    // Nums row
-    const numRowH = px(100);
-    // Padding: top + tag + gap + q + gap + a + gap + nums + bottom
-    return px(18) + tagH + px(10) + qH + px(8) + aH + px(12) + numRowH + px(18);
-  };
+  // ── Gap distribution ──
+  const CTA_H = 108;
+  const TAGLINE_H = LH * 2;
+  const INTRO_H = LH;
+  const BIG_NUM_H = 132 + 20;
+  const V_BOT = 28;
+  const fixed_h = LOGO_BOTTOM + TAGLINE_H + INTRO_H + BIG_NUM_H + card_h + CTA_H;
+  const gap = Math.max(14, Math.floor((H - V_BOT - fixed_h) / 6));
 
-  const cardBH = best  ? measureCard(best)  : 0;
-  const cardWH = worst ? measureCard(worst) : 0;
+  // ── Draw body ──
+  let y = LOGO_BOTTOM + gap + 12;
 
-  const totalH = V_PAD + LOGO_H + SUB_H + INTRO_H + NUM_H + px(16)
-               + cardBH + CARD_GAP + cardWH + CTA_PAD + CTA_MIN_H + V_PAD;
+  // Tagline
+  ctx.font = BODY_FONT; ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
+  ctx.fillText(LINE1, W/2, y); y += LH;
+  ctx.fillText(LINE2, W/2, y); y += LH;
+  y += gap/2;
 
-  // ── PASS 2: compute global scale factor ──
-  // GS: scale DOWN if content overflows, but never scale UP (avoids card overflow)
-  const GS = totalH > H ? (H / totalH) : 1.0;
-  const g  = n => Math.round(n * GS); // apply global scale on top of base
-
-  // ── PASS 3: draw everything ──
-  let y = g(V_PAD);
-
-  // KNOWTIENT logo (KNOW lower than TIENT)
-  const logoSz = g(px(88));
-  ctx.font = `${logoSz}px Righteous,cursive`;
-  ctx.fillStyle = "#C6FF00";
-  ctx.shadowColor = "rgba(198,255,0,0.5)"; ctx.shadowBlur = g(px(16));
-  ctx.textAlign = "center";
-  const kW = ctx.measureText("KNOW").width;
-  const tW = ctx.measureText("TIENT").width;
-  const gap3 = g(px(4));
-  const kx = W/2 - (kW+gap3+tW)/2;
-  ctx.fillText("KNOW",  kx + kW/2,            y + logoSz + g(px(4)));
-  ctx.fillText("TIENT", kx + kW + gap3 + tW/2, y + logoSz);
-  ctx.shadowBlur = 0;
-  y += g(LOGO_H);
-
-  // Subhead
-  const subSz = g(px(38));
-  ctx.font = `700 ${subSz}px 'Space Grotesk',sans-serif`;
-  ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
-  y = drawWC("What % of Americans answered correctly?", W/2, y + g(px(10)), IW, Math.round(subSz*1.35));
-
-  // Avg intro
-  const introSz = g(px(30));
-  ctx.font = `${introSz}px 'Space Grotesk',sans-serif`;
-  ctx.fillStyle = "#C8C3B8"; ctx.textAlign = "center";
-  ctx.fillText("My average guess was off by:", W/2, y + g(px(8)) + introSz);
-  y += g(px(8)) + introSz + g(px(10));
-
-  // Big avg number
-  const numSz = g(px(160));
-  ctx.font = `${numSz}px Righteous,cursive`;
-  ctx.fillStyle = "#F5A623";
-  ctx.shadowColor = "rgba(245,166,35,0.6)"; ctx.shadowBlur = g(px(24));
-  ctx.textAlign = "center";
-  ctx.fillText(`${avg.toFixed(1)}%`, W/2, y + numSz);
-  ctx.shadowBlur = 0;
-  y += numSz + g(px(18));
+  // Intro
+  ctx.fillStyle = "#C8C3B8";
+  ctx.fillText(INTRO, W/2, y); y += INTRO_H + gap/2;
   ctx.textAlign = "left";
 
-  // Draw a card, return bottom Y
-  const drawCard = (item, type, cardY, cardH) => {
-    const bc = type==="best" ? "#3DB87A" : "#FF2D2D";
-    rr(PAD, cardY, IW, cardH, g(px(14)), "#363375", bc, g(px(3)));
-    const cardIW = IW - g(px(36));
-    let cy = cardY + g(px(18));
+  // Big avg number
+  const avgStr = `${avg.toFixed(1)}%`;
+  ctx.font = `bold 132px 'Space Grotesk', sans-serif`;
+  const aw = ctx.measureText(avgStr).width;
+  const nx = Math.round((W - aw) / 2);
+  ctx.fillStyle = "#E8634A"; ctx.fillText(avgStr, nx+8, y+8);
+  ctx.fillStyle = "#F5A623"; ctx.fillText(avgStr, nx, y);
+  y += 132 + gap;
 
-    // Tag — draw and advance by actual font size to avoid overlap
-    const tagFontSz = g(px(26));
-    ctx.font = `700 ${tagFontSz}px 'DM Mono',monospace`;
-    ctx.fillStyle = bc;
-    const tagY = cy + tagFontSz;
-    ctx.fillText(type==="best" ? "★ MY BEST GUESS" : "✗ MY WORST GUESS", PAD+g(px(18)), tagY);
-    cy += tagFontSz + g(px(20));  // advance by actual rendered font size + gap
+  // Card
+  rr(PAD, y, IW, card_h, 14, "#363375", "#3DB87A", 3);
+  let cy = y + PIN;
+  ctx.font = `bold 19px 'Space Grotesk', sans-serif`; ctx.fillStyle = "#3DB87A";
+  ctx.fillText("★ MY CLOSEST GUESS", PAD+PIN, cy); cy += TAG_H_C;
+  cy = drawLeft(qLines, f_q, PAD+PIN, cy, "#F5F0E8", 30); cy += 8;
+  cy = drawLeft(aLines, f_a, PAD+PIN, cy, "#C8C3B8", 27); cy += 12;
 
-    // Question — dynamic font, full text, up to 4 lines
-    const qSz = fitFont(item.q.question, g(px(36)), "700 $px 'Space Grotesk',sans-serif", cardIW, 4);
-    ctx.font = `700 ${qSz}px 'Space Grotesk',sans-serif`;
-    ctx.fillStyle = "#F5F0E8";
-    cy = drawW(item.q.question, PAD+g(px(18)), cy, cardIW, Math.round(qSz*1.4));
-    cy += g(px(8));
+  // 2-col nums
+  const col2 = [{lbl:"Real % who knew", val:`${cardReal}%`, col:"#F5F0E8"},{lbl:"My guess", val:`${cardMy}%`, col:"#F5A623"}];
+  const cw2 = IW/2;
+  col2.forEach(({lbl,val,col},i) => {
+    const ccx = PAD + cw2*i + cw2/2;
+    ctx.font = f_n; ctx.fillStyle = col; ctx.textAlign = "center";
+    ctx.fillText(val, ccx, cy+72);
+    ctx.font = f_l; ctx.fillStyle = "#C8C3B8";
+    ctx.fillText(lbl, ccx, cy+72+26);
+  });
+  ctx.textAlign = "left";
+  y += card_h + gap;
 
-    // Answer — dynamic font, full text, up to 4 lines, no truncation
-    const ansT = `Correct answer: ${item.q.correct_answer}`;
-    const aSz  = fitFont(ansT, g(px(30)), "$px 'Space Grotesk',sans-serif", cardIW, 4);
-    ctx.font = `${aSz}px 'Space Grotesk',sans-serif`;
-    ctx.fillStyle = "#C8C3B8";
-    cy = drawW(ansT, PAD+g(px(18)), cy, cardIW, Math.round(aSz*1.4));
-    cy += g(px(12));
+  // ── CTA: alternating stripes, text exactly centered ──
+  const BX=PAD, BY=y, BW=IW, BH=CTA_H, R=14;
+  const STRIPE_W = 20;
 
-    // Numbers row
-    const numCols = [
-      { label:"Real %",    val:`${item.q.pct_correct}%`, color:"#F5A623" },
-      { label:"Your guess",val:`${item.g.guess}%`,        color:"#00F0FF" },
-      { label:"Off by",    val:`±${item.delta}`, color:item.delta<=10?"#C6FF00":item.delta<=19?"#F5A623":"#FF2D2D" },
-    ];
-    numCols.forEach((nc, ci) => {
-      const nx = PAD + g(px(10)) + ci * (IW/3);
-      ctx.font = `${g(px(58))}px Righteous,cursive`; ctx.fillStyle = nc.color;
-      ctx.fillText(nc.val, nx, cy + g(px(40)));
-      ctx.font = `500 ${g(px(24))}px 'DM Mono',monospace`; ctx.fillStyle = "#C8C3B8";
-      ctx.fillText(nc.label, nx, cy + g(px(40)) + g(px(22)));
-    });
-    return cardY + cardH;
-  };
+  // Draw stripes onto offscreen canvas, then clip + composite
+  const stripeCanvas = document.createElement("canvas");
+  stripeCanvas.width = W*dpr; stripeCanvas.height = H*dpr;
+  const sctx = stripeCanvas.getContext("2d");
+  sctx.scale(dpr, dpr);
+  let si = 0;
+  for (let sx = BX-BH; sx < BX+BW+BH; sx += STRIPE_W) {
+    sctx.fillStyle = si%2===0 ? "rgba(200,115,8,0.78)" : "rgba(210,70,40,0.70)";
+    sctx.save();
+    sctx.translate(sx, BY);
+    sctx.beginPath();
+    sctx.moveTo(0,0); sctx.lineTo(STRIPE_W,0); sctx.lineTo(STRIPE_W+BH,BH); sctx.lineTo(BH,BH);
+    sctx.closePath(); sctx.fill(); sctx.restore();
+    si++;
+  }
+  // Clip to rounded rect
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(BX+R,BY); ctx.lineTo(BX+BW-R,BY); ctx.quadraticCurveTo(BX+BW,BY,BX+BW,BY+R);
+  ctx.lineTo(BX+BW,BY+BH-R); ctx.quadraticCurveTo(BX+BW,BY+BH,BX+BW-R,BY+BH);
+  ctx.lineTo(BX+R,BY+BH); ctx.quadraticCurveTo(BX,BY+BH,BX,BY+BH-R);
+  ctx.lineTo(BX,BY+R); ctx.quadraticCurveTo(BX,BY,BX+R,BY);
+  ctx.closePath(); ctx.clip();
+  ctx.drawImage(stripeCanvas, 0, 0, W, H);
+  ctx.restore();
 
-  // Draw cards
-  const scaledBH = g(cardBH);
-  const scaledWH = g(cardWH);
-  if (best)  { y = drawCard(best,  "best",  y, scaledBH) + g(CARD_GAP); }
-  if (worst) { y = drawCard(worst, "worst", y, scaledWH); }
+  // Inner border
+  rr(BX+3, BY+3, BW-6, BH-6, R-2, null, "rgba(180,100,5,0.8)", 2);
 
-  // CTA — max 25% of canvas height
-  const ctaY = y + g(CTA_PAD);
-  const ctaMaxH = Math.round(H * 0.25);
-  const ctaH = Math.min(ctaMaxH, Math.max(g(CTA_MIN_H), H - ctaY - g(px(28))));
-  rr(PAD, ctaY, IW, ctaH, g(px(12)), "#F5A623");
-  ctx.textAlign = "center";
-  const cta1Sz = Math.min(g(px(46)), Math.round(ctaH * 0.32));
-  const cta2Sz = Math.min(g(px(58)), Math.round(ctaH * 0.44));
-  ctx.font = `700 ${cta1Sz}px 'Space Grotesk',sans-serif`;
-  ctx.fillStyle = "#2D2A5E";
-  ctx.fillText("Can you beat it?", W/2, ctaY + ctaH * 0.36);
-  ctx.font = `700 ${cta2Sz}px Righteous,cursive`;
-  ctx.fillText("Knowtient.com", W/2, ctaY + ctaH * 0.72);
+  // CTA text — measure then center using actual metrics
+  let ctaSz = Math.max(28, Math.floor((BH-40)*0.72));
+  while (ctaSz > 20) {
+    ctx.font = `bold ${ctaSz}px 'Space Grotesk', sans-serif`;
+    if (ctx.measureText("Can you beat me?").width <= BW-64) break;
+    ctaSz -= 2;
+  }
+  ctx.font = `bold ${ctaSz}px 'Space Grotesk', sans-serif`;
+  const ctaM = ctx.measureText("Can you beat me?");
+  // actualBoundingBoxAscent/Descent give true pixel height
+  const ctaAscent  = ctaM.actualBoundingBoxAscent  || ctaSz * 0.72;
+  const ctaDescent = ctaM.actualBoundingBoxDescent || ctaSz * 0.18;
+  const ctaH_real  = ctaAscent + ctaDescent;
+  // Center: baseline y = BY + (BH + ctaAscent - ctaDescent) / 2
+  const ctaBaselineY = BY + Math.round((BH + ctaAscent - ctaDescent) / 2);
+  ctx.fillStyle = "#F5F0E8"; ctx.textAlign = "center";
+  ctx.fillText("Can you beat me?", W/2, ctaBaselineY);
   ctx.textAlign = "left";
 
   return canvas.toDataURL("image/png");
@@ -1235,18 +1225,28 @@ function EndScreen({ round, guesses, onPlayAgain, onShare }) {
 function ShareCard({ guesses, round, onClose }) {
   const avg       = avgDeviation(guesses);
   const mobile    = isMobile();
-  const shareText = `What is your Knowtient? I guessed what % of strangers got trivia answers right. ${avg.toFixed(1)} pts off avg. Knowtient.com`;
-  const [status,   setStatus]   = useState("");
-  const [preview,  setPreview]  = useState(null); // data URL for lightbox
-  const [prevPlat, setPrevPlat] = useState(null); // which platform is previewed
+  const shareText = `What is your Knowtient? Guess what % of Americans knew the answers to seven common questions. My avg was ${avg.toFixed(1)} pts off. Knowtient.com`;
+  const [status, setStatus] = useState("");
+  const [preview, setPreview] = useState(null);
 
-  // Preview generated on first platform click — no default
+  // Generate preview on mount
+  useEffect(() => {
+    const url = drawShareCanvas(avg, guesses, round);
+    setPreview(url);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleMobileShare = async () => {
+  const handleSave = () => {
+    setStatus("Saving…");
+    const dataUrl = drawShareCanvas(avg, guesses, round);
+    downloadDataUrl(dataUrl, "knowtient-score.png");
+    setStatus("Saved!");
+  };
+
+  const handleShare = async () => {
     setStatus("Preparing…");
     try {
-      const dataUrl = drawShareCanvas(avg, guesses, round, 1080, 1080);
+      const dataUrl = drawShareCanvas(avg, guesses, round);
       const file    = dataUrlToFile(dataUrl, "knowtient-score.png");
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], text: shareText });
@@ -1260,98 +1260,33 @@ function ShareCard({ guesses, round, onClose }) {
     }
   };
 
-  const handleMobileSave = () => {
-    setStatus("Saving…");
-    const dataUrl = drawShareCanvas(avg, guesses, round, 1080, 1080);
-    downloadDataUrl(dataUrl, "knowtient-score.png");
-    setStatus("Saved!");
-  };
-
-  const handleDesktopPlatform = (platform) => {
-    // Generate preview for this platform
-    const url = drawShareCanvas(avg, guesses, round, platform.w, platform.h);
-    setPreview(url);
-    setPrevPlat(platform.id);
-    downloadDataUrl(url, platform.filename);
-    setTimeout(() => {
-      window.open(platform.url, "_blank", "noopener");
-      setStatus(`${platform.label} image saved — post it!`);
-    }, 400);
-  };
-
   return (
     <div className="share-overlay" onClick={onClose}>
       <div className="share-card" onClick={e => e.stopPropagation()}>
 
-        {mobile ? (
-          /* ── MOBILE ── */
-          <>
-            <div className="share-card-headline">What is your Knowtient?</div>
-            <div className="share-card-subhead">What % of Americans answered questions correctly?</div>
-            <div className="share-card-avg-line">My average guess was off by:</div>
-            <div className="share-score-row">
-              <span className="share-score-num">{avg.toFixed(1)}</span>
-              <span className="share-score-unit">% off avg</span>
-            </div>
-            <div className="share-dots">
-              {guesses.map((g,i) => {
-                const delta = Math.abs(g.guess - g.real);
-                return <div key={i} className={`share-dot ${deltaColorClass(delta)}`}>{delta}</div>;
-              })}
-            </div>
-            <div className="share-divider" />
-            <div className="share-mobile-section">
-              <button className="btn-primary" onClick={handleMobileShare}>SHARE →</button>
-              <button className="btn-secondary" onClick={handleMobileSave}>SAVE RESULTS</button>
-            </div>
-          </>
-        ) : (
-          /* ── DESKTOP ── */
-          <>
-            {/* Lightbox preview */}
-            <div style={{
-              width:"100%", borderRadius:12, overflow:"hidden",
-              marginBottom:16, background:"#1a1840",
-              border:"2px solid var(--color-border)",
-              minHeight:180, maxHeight:360, display:"flex", alignItems:"center", justifyContent:"center",
-            }}>
-              {preview
-                ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:356}} />
-                : <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)",padding:24,textAlign:"center"}}>Click a platform icon to preview and save</span>
-              }
-            </div>
-            <p style={{
-              fontFamily:"'DM Mono',monospace", fontSize:13,
-              color:"var(--color-secondary)", textAlign:"center",
-              marginBottom:16, lineHeight:1.5,
-            }}>
-              Each click saves a snapshot and opens the app. Post the snapshot manually.
-            </p>
-            {/* Platform icons — real brand SVGs, white on dark, single centered row */}
-            <div style={{display:"flex", justifyContent:"center", gap:16, marginBottom:8}}>
-              {PLATFORMS.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => handleDesktopPlatform(p)}
-                  title={p.label}
-                  style={{
-                    background: prevPlat===p.id ? "rgba(245,166,35,0.15)" : "#1a1840",
-                    border: `2px solid ${prevPlat===p.id ? "var(--color-amber)" : "var(--color-border)"}`,
-                    borderRadius:14, width:60, height:60,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    cursor:"pointer",
-                    transition:"border-color 0.15s, background 0.15s",
-                    padding:14,
-                  }}
-                  dangerouslySetInnerHTML={{__html: PLATFORM_ICONS[p.svgKey]}}
-                />
-              ))}
-            </div>
-          </>
-        )}
+        {/* Preview — shown on all devices */}
+        <div style={{
+          width:"100%", borderRadius:12, overflow:"hidden",
+          marginBottom:16, background:"#1a1840",
+          border:"2px solid var(--color-border)",
+          minHeight:180, maxHeight:360, display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          {preview
+            ? <img src={preview} alt="Share preview" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",maxHeight:356}} />
+            : <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)",padding:24,textAlign:"center"}}>Generating…</span>
+          }
+        </div>
+
+        {/* Actions */}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+          {mobile && (
+            <button className="btn-primary" onClick={handleShare}>SHARE →</button>
+          )}
+          <button className="btn-secondary" onClick={handleSave}>SAVE RESULTS</button>
+        </div>
 
         {status && <div className="share-status">{status}</div>}
-        <div style={{marginTop:12}}>
+        <div style={{marginTop:8}}>
           <button className="btn-secondary" onClick={onClose}>CLOSE</button>
         </div>
       </div>
