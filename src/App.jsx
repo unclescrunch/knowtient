@@ -4,6 +4,63 @@ import questionsData from "./pew-questions-v4.json";
 // ─── SEEN QUESTIONS ───────────────────────────────────────────────────────────
 const seenIds = new Set();
 
+// ── Score database: persists top scores in localStorage ──
+// ── Supabase score DB ──────────────────────────────────────────────────────────
+const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL;
+const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function saveScore(avg) {
+  // Insert score and return percentile in one round-trip
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPA_KEY,
+        "Authorization": `Bearer ${SUPA_KEY}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ avg_off: parseFloat(avg.toFixed(1)) }),
+    });
+    if (!res.ok) console.warn("Score insert failed", res.status);
+  } catch (e) { console.warn("Score insert error", e); }
+}
+
+async function fetchPercentile(avg) {
+  // What % of all scores are WORSE (higher) than this score?
+  try {
+    const avgRounded = parseFloat(avg.toFixed(1));
+    // Count scores worse than mine
+    const worseRes = await fetch(
+      `${SUPA_URL}/rest/v1/scores?avg_off=gt.${avgRounded}&select=id`,
+      {
+        headers: {
+          "apikey": SUPA_KEY,
+          "Authorization": `Bearer ${SUPA_KEY}`,
+          "Prefer": "count=exact",
+          "Range": "0-0",
+        },
+      }
+    );
+    // Count total scores
+    const totalRes = await fetch(
+      `${SUPA_URL}/rest/v1/scores?select=id`,
+      {
+        headers: {
+          "apikey": SUPA_KEY,
+          "Authorization": `Bearer ${SUPA_KEY}`,
+          "Prefer": "count=exact",
+          "Range": "0-0",
+        },
+      }
+    );
+    const worseCount = parseInt(worseRes.headers.get("Content-Range")?.split("/")[1] || "0");
+    const totalCount = parseInt(totalRes.headers.get("Content-Range")?.split("/")[1] || "1");
+    if (totalCount < 2) return null; // not enough data yet
+    return Math.round((worseCount / totalCount) * 100);
+  } catch (e) { console.warn("Percentile fetch error", e); return null; }
+}
+
 // ─── MOBILE DETECTION ────────────────────────────────────────────────────────
 const isMobile = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -655,9 +712,12 @@ const GlobalStyles = () => (
 const BIBLE_IDS    = new Set(['pew_religion_2019_001','pew_religion_2019_002','pew_religion_2019_012','pew_religion_2019_025']);
 const REGIONAL_RELIGION_IDS = new Set(['pew_intl_2022_003']);
 
+const OMIT_IDS     = new Set(['pew_sci_2019_002']); // ear infection — omitted permanently
+const JUDAISM_IDS  = new Set(['pew_religion_2019_007','pew_religion_2019_017','pew_religion_2019_020','pew_religion_2019_023','pew_religion_2019_030']);
+
 function buildRound(allQuestions) {
   const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
-  const unflagged = allQuestions.filter(q => !q.flagged && !q.image_dependent);
+  const unflagged = allQuestions.filter(q => !q.flagged && !q.image_dependent && !OMIT_IDS.has(q.id));
 
   const getAvailable = () => unflagged.filter(q => !seenIds.has(q.id));
   let available = getAvailable();
@@ -723,21 +783,46 @@ function buildRound(allQuestions) {
   filtered = ensureMax1(BIBLE_IDS, filtered);
   filtered = ensureMax1(REGIONAL_RELIGION_IDS, filtered);
 
-  // Place the two religion questions at fixed positions: 4th (index 3) and 7th (index 6)
+  // Enforce max 1 Judaism question per round
+  const ensureMax1Judaism = (arr) => {
+    const judMatches = arr.filter(q => JUDAISM_IDS.has(q.id));
+    if (judMatches.length <= 1) return arr;
+    let kept = false;
+    return arr.map(q => {
+      if (!JUDAISM_IDS.has(q.id)) return q;
+      if (!kept) { kept = true; return q; }
+      const roundIds = new Set(arr.map(r => r.id));
+      const replacement = shuffle(available.filter(r =>
+        !roundIds.has(r.id) && !JUDAISM_IDS.has(r.id) && r.category === 'religion'
+      ))[0];
+      return replacement || q;
+    });
+  };
+  filtered = ensureMax1Judaism(filtered);
+
+  // Separate by category for final ordering
   const religionQs  = filtered.filter(q => q.category === 'religion');
-  const nonReligion = filtered.filter(q => q.category !== 'religion');
-  // nonReligion has 5 items; religion has 2
-  // Build ordered array: slots 0,1,2 → nonReligion[0..2], slot 3 → religion[0],
-  // slots 4,5 → nonReligion[3..4], slot 6 → religion[1]
+  const worldQs     = filtered.filter(q => q.category === 'world');
+  const otherQs     = filtered.filter(q => q.category !== 'religion' && q.category !== 'world');
+
+  // Order: world first (slot 0), then others (slots 1-2), religion (slot 3),
+  // others (slots 4-5), religion (slot 6)
   const result = [
-    nonReligion[0], nonReligion[1], nonReligion[2],
+    worldQs[0]  || otherQs[0],
+    otherQs[0]  || otherQs[1],
+    otherQs[1]  || otherQs[2],
     religionQs[0],
-    nonReligion[3], nonReligion[4],
+    otherQs[2]  || otherQs[3],
+    otherQs[3]  || otherQs[4],
     religionQs[1],
   ].filter(Boolean);
 
-  result.forEach(q => seenIds.add(q.id));
-  return result;
+  // Deduplicate in case of fallback collisions
+  const seen = new Set();
+  const deduped = result.filter(q => { if (!q || seen.has(q.id)) return false; seen.add(q.id); return true; });
+
+  deduped.forEach(q => seenIds.add(q.id));
+  return deduped;
 }
 function avgDeviation(guesses) {
   if (!guesses.length) return null;
@@ -913,9 +998,9 @@ function SplashScreen({ onStart }) {
         <div className="splash">
           <div className="splash-top">
             <div className="splash-rules">
-              <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">You will see <strong>seven real questions</strong> that Pew Research already asked thousands of Americans.</span></div>
+              <div className="splash-rule"><div className="splash-rule-icon">📊</div><span className="splash-rule-text">Each round contains <strong>seven real questions</strong> that Pew Research already asked thousands of Americans.</span></div>
               <div className="splash-rule-divider" />
-              <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text"><strong>Your challenge:</strong> guess what % of Americans answered that question correctly.</span></div>
+              <div className="splash-rule"><div className="splash-rule-icon">🎯</div><span className="splash-rule-text"><strong>Your challenge:</strong> guess what % of Americans answered each question correctly.</span></div>
 
             </div>
           </div>
@@ -984,6 +1069,17 @@ shuffledChoices.current = moveToEnd(shuffled);
           <span className="q-source-label">{question.survey_year}</span>
         </div>
         <div className="q-text">{question.question}</div>
+        <div className="answer-choices-wrap">
+          <div className="answer-choices-label">Answer options</div>
+          <div className="answer-choices">
+            {shuffledChoices.current.map((choice, i) => (
+              <div key={i} className={`answer-choice ${i < visibleChoices ? "animate-in" : ""}`}>
+                <span className="answer-choice-letter">{LETTERS[i]}</span>
+                <span className="answer-choice-text">{choice}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="slider-section">
           <div className="slider-prompt-label">What % got this right?</div>
           <div className={`slider-live-number ${moved?"active":"inactive"}`}>
@@ -999,17 +1095,6 @@ shuffledChoices.current = moveToEnd(shuffled);
           <button className="btn-primary" onClick={() => { playSelect(value); onSubmit(value); }}>
             SUBMIT →
           </button>
-        </div>
-        <div className="answer-choices-wrap">
-          <div className="answer-choices-label">Answer options</div>
-          <div className="answer-choices">
-            {shuffledChoices.current.map((choice, i) => (
-              <div key={i} className={`answer-choice ${i < visibleChoices ? "animate-in" : ""}`}>
-                <span className="answer-choice-letter">{LETTERS[i]}</span>
-                <span className="answer-choice-text">{choice}</span>
-              </div>
-            ))}
-          </div>
         </div>
         <div className="q-source-footer" style={{display:"none"}}>{question.source_label}</div>
       </div>
@@ -1150,7 +1235,7 @@ function DebriefModal({ round, guesses, onClose }) {
 }
 
 // ─── END SCREEN ───────────────────────────────────────────────────────────────
-function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp }) {
+function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percentile }) {
   const avg = avgProp ?? avgDeviation(guesses);
   const [run, setRun]               = useState(false);
   const [showDebrief, setShowDebrief] = useState(false);
@@ -1210,12 +1295,23 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp }) {
                 size="end" colorMode="normal" animClass="number-arrive"
               />
             </div>
+            <div style={{textAlign:"center",marginBottom:4,minHeight:28}}>
+              {percentile !== null ? (
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,color:"var(--color-amber)",letterSpacing:"0.02em"}}>
+                  Better than {percentile}% of players
+                </span>
+              ) : (
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
+                  calculating rank…
+                </span>
+              )}
+            </div>
             <div className="end-highlights">
               <HighlightCard data={best}  type="best" />
               <HighlightCard data={worst} type="worst" />
             </div>
             <div className="end-ctas">
-              <button className="btn-primary"   onClick={onPlayAgain}>PLAY AGAIN</button>
+              <button className="btn-primary"   onClick={onPlayAgain}>PLAY MORE QUESTIONS</button>
               {isMobile() ? (
                 <button className="btn-secondary" onClick={async () => {
                   const avgVal = avg || 0;
@@ -1335,6 +1431,7 @@ export default function App() {
   }, [questions]);
 
   const handlePlayAgain = useCallback(() => {
+    setPercentile(null);
     // Reset audio context so it works fresh on next round (mobile suspension fix)
     try { if (audioCtx) { audioCtx.close(); } } catch {}
     audioCtx = null;
@@ -1352,7 +1449,14 @@ export default function App() {
   const handleNext = useCallback(() => {
     const newGuesses = [...guesses, {guess:lastGuess, real:round[qIndex].pct_correct}];
     setGuesses(newGuesses);
-    if (qIndex + 1 >= TOTAL) { setScreen("end"); return; }
+    if (qIndex + 1 >= TOTAL) {
+      const finalAvg = avgDeviation([...guesses, {guess:lastGuess, real:round[qIndex].pct_correct}]);
+      setPercentile(null); // reset while loading
+      setScreen("end");
+      // Fire-and-forget: save then fetch percentile
+      saveScore(finalAvg).then(() => fetchPercentile(finalAvg).then(p => setPercentile(p)));
+      return;
+    }
     setQAnim("screen-exit");
     setTimeout(() => { setQIndex(i=>i+1); setScreen("question"); setQAnim("screen-enter"); }, 160);
   }, [guesses, lastGuess, round, qIndex]);
@@ -1381,7 +1485,7 @@ export default function App() {
             <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} />
           )}
           {screen === "end" && (
-            <EndScreen round={round} guesses={guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(guesses)} />
+            <EndScreen round={round} guesses={guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(guesses)} percentile={percentile} />
           )}
         </div>
         {showShare && !isMobile() && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} />}
