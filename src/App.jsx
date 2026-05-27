@@ -1148,16 +1148,16 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
       {flashType && <div className={`flash-overlay active${flashType==="green"?" flash-green":""}`} />}
       <div className={`screen ${animClass}`} style={screenBg?{background:screenBg}:{}}>
         <div className="reveal-screen">
-          <div className="reveal-top-label">REAL KNOWTIENT</div>
-          <div className="reveal-big-number-wrap">
-            <BigNumber value={countedValue} size="full" colorMode={colorMode} animClass={numClass} />
-          </div>
           <div className="reveal-question-recap">
             <div className="reveal-recap-q">{question.question}</div>
             <div className={isFail?"card-big-miss reveal-answer-card":"card reveal-answer-card"}>
               <div className="reveal-answer-card-label">Correct answer</div>
               <div className="reveal-answer-card-text">{question.correct_answer}</div>
             </div>
+          </div>
+          <div className="reveal-top-label">REAL KNOWTIENT</div>
+          <div className="reveal-big-number-wrap">
+            <BigNumber value={countedValue} size="full" colorMode={colorMode} animClass={numClass} />
           </div>
           <div className="reveal-bar-section">
             <div className="reveal-bar-track">
@@ -1262,20 +1262,15 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
         <div className={`highlight-tag ${type}`}>{type==="best"?"★ YOUR BEST GUESS":"✗ YOUR WORST GUESS"}</div>
         <div className="highlight-question">{data.q.question}</div>
         <div className="highlight-answer">Correct answer: <span>{data.q.correct_answer}</span></div>
-        <div className="highlight-nums">
-          <div className="highlight-num-block">
+        <div className="highlight-nums" style={{justifyContent:"center",gap:32}}>
+          <div className="highlight-num-block" style={{alignItems:"center",textAlign:"center"}}>
             <div className="highlight-big-num real">{data.q.pct_correct}%</div>
             <div className="highlight-num-label">Real %</div>
           </div>
           <div className="highlight-sep">vs</div>
-          <div className="highlight-num-block">
+          <div className="highlight-num-block" style={{alignItems:"center",textAlign:"center"}}>
             <div className="highlight-big-num you">{data.g.guess}%</div>
             <div className="highlight-num-label">Your guess</div>
-          </div>
-          <div className="highlight-sep">·</div>
-          <div className="highlight-num-block">
-            <div className={`highlight-big-num delta ${cls}`}>±{data.delta}</div>
-            <div className="highlight-num-label">Off by</div>
           </div>
         </div>
       </div>
@@ -1402,6 +1397,7 @@ export default function App() {
   const [qIndex,    setQIndex]    = useState(0);
   const [guesses,   setGuesses]   = useState([]);
   const [lastGuess, setLastGuess] = useState(null);
+  const lastGuessRef = useRef(null);
   const [showShare, setShowShare] = useState(false);
   const [qAnim,     setQAnim]     = useState("screen-enter");
   const questions = questionsData.questions;
@@ -1441,12 +1437,14 @@ export default function App() {
   }, [questions]);
 
   const handleSubmit = (guess) => {
+    lastGuessRef.current = guess;  // sync, available immediately
     setLastGuess(guess); setQAnim("screen-exit");
     setTimeout(() => { setScreen("reveal"); setQAnim("screen-enter"); }, 160);
   };
 
   const handleNext = useCallback(() => {
-    const newGuesses = [...guesses, {guess:lastGuess, real:round[qIndex].pct_correct}];
+    const currentGuess = lastGuessRef.current;  // always current, never stale
+    const newGuesses = [...guesses, {guess:currentGuess, real:round[qIndex].pct_correct}];
     if (qIndex + 1 >= TOTAL) {
       finalGuessesRef.current = newGuesses;  // sync — available immediately
       setGuesses(newGuesses);
@@ -1459,7 +1457,7 @@ export default function App() {
     setGuesses(newGuesses);
     setQAnim("screen-exit");
     setTimeout(() => { setQIndex(i=>i+1); setScreen("question"); setQAnim("screen-enter"); }, 160);
-  }, [guesses, lastGuess, round, qIndex]);
+  }, [guesses, round, qIndex]);  // lastGuessRef is a ref, not a dep
 
   const showProgress = screen === "question" || screen === "reveal";
   // Hide persistent title bar on title screen AND end screen
