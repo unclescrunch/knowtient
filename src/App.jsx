@@ -566,7 +566,7 @@ const GlobalStyles = () => (
     .highlight-answer span { color:var(--color-text); font-weight:600; }
     .highlight-nums { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
     .highlight-num-block { display:flex; flex-direction:column; align-items:center; }
-    .highlight-big-num { font-family:'Righteous',cursive; font-size:36px; line-height:1; }
+    .highlight-big-num { font-family:'Righteous',cursive; font-size:46px; line-height:1; }
     .highlight-big-num.real  { color:var(--color-amber); text-shadow:0 0 14px rgba(245,166,35,0.4); }
     .highlight-big-num.you   { color:var(--color-neon-cyan); text-shadow:0 0 10px rgba(0,240,255,0.35); }
     .highlight-big-num.delta.green { color:var(--color-neon-lime); }
@@ -1152,6 +1152,13 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
           <div className="reveal-big-number-wrap">
             <BigNumber value={countedValue} size="full" colorMode={colorMode} animClass={numClass} />
           </div>
+          <div className="reveal-question-recap">
+            <div className="reveal-recap-q">{question.question}</div>
+            <div className={isFail?"card-big-miss reveal-answer-card":"card reveal-answer-card"}>
+              <div className="reveal-answer-card-label">Correct answer</div>
+              <div className="reveal-answer-card-text">{question.correct_answer}</div>
+            </div>
+          </div>
           <div className="reveal-bar-section">
             <div className="reveal-bar-track">
               <div className={`reveal-bar-fill${barWave?" wave-go":""}`} style={{width:runCount?`${realPct}%`:"0%",background:barColor}} />
@@ -1173,13 +1180,6 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
               minHeight: "38px",
             }}
           >{voiceLabel(delta)}</div>
-          <div className="reveal-question-recap">
-            <div className="reveal-recap-q">{question.question}</div>
-            <div className={isFail?"card-big-miss reveal-answer-card":"card reveal-answer-card"}>
-              <div className="reveal-answer-card-label">Correct answer</div>
-              <div className="reveal-answer-card-text">{question.correct_answer}</div>
-            </div>
-          </div>
           <div className="reveal-bottom">
             <button className="btn-primary large" onClick={onNext}>
               {isLast ? "SEE RESULTS →" : "NEXT →"}
@@ -1307,8 +1307,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
               )}
             </div>
             <div className="end-highlights">
-              <HighlightCard data={best}  type="best" />
-              <HighlightCard data={worst} type="worst" />
+              <HighlightCard data={best} type="best" />
             </div>
             <div className="end-ctas">
               <button className="btn-primary"   onClick={onPlayAgain}>PLAY MORE QUESTIONS</button>
@@ -1448,15 +1447,16 @@ export default function App() {
 
   const handleNext = useCallback(() => {
     const newGuesses = [...guesses, {guess:lastGuess, real:round[qIndex].pct_correct}];
-    setGuesses(newGuesses);
     if (qIndex + 1 >= TOTAL) {
-      const finalAvg = avgDeviation([...guesses, {guess:lastGuess, real:round[qIndex].pct_correct}]);
-      setPercentile(null); // reset while loading
+      finalGuessesRef.current = newGuesses;  // sync — available immediately
+      setGuesses(newGuesses);
+      const finalAvg = avgDeviation(newGuesses);
+      setPercentile(null);
       setScreen("end");
-      // Fire-and-forget: save then fetch percentile
       saveScore(finalAvg).then(() => fetchPercentile(finalAvg).then(p => setPercentile(p)));
       return;
     }
+    setGuesses(newGuesses);
     setQAnim("screen-exit");
     setTimeout(() => { setQIndex(i=>i+1); setScreen("question"); setQAnim("screen-enter"); }, 160);
   }, [guesses, lastGuess, round, qIndex]);
@@ -1485,7 +1485,7 @@ export default function App() {
             <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} />
           )}
           {screen === "end" && (
-            <EndScreen round={round} guesses={guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(guesses)} percentile={percentile} />
+            <EndScreen round={round} guesses={finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses)} percentile={percentile} />
           )}
         </div>
         {showShare && !isMobile() && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} />}
