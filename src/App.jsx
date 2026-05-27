@@ -1397,9 +1397,11 @@ export default function App() {
   const [qIndex,    setQIndex]    = useState(0);
   const [guesses,   setGuesses]   = useState([]);
   const [lastGuess, setLastGuess] = useState(null);
-  const lastGuessRef = useRef(null);
-  const [showShare, setShowShare] = useState(false);
-  const [qAnim,     setQAnim]     = useState("screen-enter");
+  const lastGuessRef    = useRef(null);
+  const finalGuessesRef = useRef([]);
+  const [showShare,   setShowShare]   = useState(false);
+  const [qAnim,       setQAnim]       = useState("screen-enter");
+  const [percentile,  setPercentile]  = useState(null);
   const questions = questionsData.questions;
 
   // Enter key fires primary action for current screen
@@ -1421,6 +1423,7 @@ export default function App() {
     // Resume audio context on each new round (mobile browsers suspend it)
     try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
     const r = buildRound(questions);
+    finalGuessesRef.current = [];
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
   }, [questions]);
@@ -1431,6 +1434,8 @@ export default function App() {
     try { if (audioCtx) { audioCtx.close(); } } catch {}
     audioCtx = null;
     // Skip title — go straight to first question of new round
+    finalGuessesRef.current = [];
+    lastGuessRef.current = null;
     const r = buildRound(questions);
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
