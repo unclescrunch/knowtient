@@ -1407,6 +1407,7 @@ export default function App() {
   const [screen,    setScreen]    = useState("title");
   const [round,     setRound]     = useState([]);
   const [qIndex,    setQIndex]    = useState(0);
+  const qIndexRef = useRef(0);
   const [guesses,   setGuesses]   = useState([]);
   const [lastGuess, setLastGuess] = useState(null);
   const lastGuessRef    = useRef(null);
@@ -1436,6 +1437,7 @@ export default function App() {
     try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
     const r = buildRound(questions);
     finalGuessesRef.current = [];
+    qIndexRef.current = 0;
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
   }, [questions]);
@@ -1460,22 +1462,27 @@ export default function App() {
   };
 
   const handleNext = useCallback(() => {
-    const currentGuess = lastGuessRef.current;  // always current, never stale
-    const newGuesses = [...guesses, {guess:currentGuess, real:round[qIndex].pct_correct}];
-    if (qIndex + 1 >= TOTAL) {
-      finalGuessesRef.current = newGuesses;  // sync — available immediately
+    const qi = qIndexRef.current;             // always current — never stale
+    const currentGuess = lastGuessRef.current;
+    const newGuesses = [...guesses, {guess:currentGuess, real:round[qi].pct_correct}];
+    if (qi + 1 >= TOTAL) {
+      finalGuessesRef.current = newGuesses;
       setGuesses(newGuesses);
       const finalAvg = avgDeviation(newGuesses);
       setPercentile(null);
       setScreen("end");
-      // Small delay lets Supabase commit the insert before we count
       saveScore(finalAvg).then(() => new Promise(r => setTimeout(r, 800))).then(() => fetchPercentile(finalAvg)).then(p => setPercentile(p));
       return;
     }
     setGuesses(newGuesses);
     setQAnim("screen-exit");
-    setTimeout(() => { setQIndex(i=>i+1); setScreen("question"); setQAnim("screen-enter"); }, 160);
-  }, [guesses, round, qIndex]);  // lastGuessRef is a ref, not a dep
+    setTimeout(() => {
+      qIndexRef.current = qi + 1;             // advance ref synchronously before render
+      setQIndex(qi + 1);
+      setScreen("question");
+      setQAnim("screen-enter");
+    }, 160);
+  }, [guesses, round]);  // qIndexRef and lastGuessRef are refs — not deps
 
   const showProgress = screen === "question" || screen === "reveal";
   // Hide persistent title bar on title screen AND end screen
