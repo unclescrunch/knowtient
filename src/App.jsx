@@ -546,6 +546,13 @@ const GlobalStyles = () => (
     .end-headline { font-family:'Righteous',cursive; font-size:clamp(32px,9vw,52px); color:#C6FF00; letter-spacing:0.04em; line-height:1.1; margin-bottom:8px; text-shadow:2px 3px 0 #1a7a50,0 0 20px rgba(198,255,0,0.5); width:100%; text-align:center; }
     .end-subhead  { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:var(--color-text); margin-bottom:4px; max-width:320px; }
     .end-avg-intro { font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600; color:var(--color-secondary); margin-bottom:0; }
+    .percentile-wrap { text-align:center; margin:8px 0 4px; min-height:80px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .percentile-label-top { font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:500; color:var(--color-secondary); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:2px; }
+    .percentile-label-bot { font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:500; color:var(--color-secondary); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px; }
+    .percentile-number-svg { overflow:visible; display:block; width:180px; }
+    @keyframes percentileBounce { 0%{transform:scale(0.4);opacity:0} 60%{transform:scale(1.12)} 80%{transform:scale(0.96)} 100%{transform:scale(1);opacity:1} }
+    .percentile-bounce { animation: percentileBounce 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+    .percentile-calculating { font-family:'DM Mono',monospace; font-size:13px; color:var(--color-secondary); }
     .end-avg-number-wrap { display:flex; justify-content:center; width:100%; margin-bottom:10px; animation:avgDance 3.2s ease-in-out infinite; }
     @keyframes avgDance { 0%,100%{transform:translateY(0) rotate(0deg) scale(1)} 15%{transform:translateY(-7px) rotate(-2deg) scale(1.04)} 35%{transform:translateY(4px) rotate(1.5deg) scale(0.97)} 55%{transform:translateY(-4px) rotate(-1deg) scale(1.02)} 75%{transform:translateY(3px) rotate(1deg) scale(0.99)} 88%{transform:translateY(-2px) rotate(-0.5deg) scale(1.01)} }
 
@@ -1235,6 +1242,38 @@ function DebriefModal({ round, guesses, onClose }) {
   );
 }
 
+// ─── PERCENTILE REVEAL ───────────────────────────────────────────────────────
+function PercentileReveal({ percentile }) {
+  const run = percentile !== null && percentile >= 0;
+  const counted = useCountUp(run ? percentile : 0, 900, run);
+  const displayed = Math.round(counted);
+
+  if (percentile === null) return (
+    <div className="percentile-wrap"><span className="percentile-calculating">calculating rank…</span></div>
+  );
+  if (percentile === -1) return (
+    <div className="percentile-wrap"><span className="percentile-calculating">you're one of the first players</span></div>
+  );
+  if (percentile === -2) return (
+    <div className="percentile-wrap"><span className="percentile-calculating">rank unavailable</span></div>
+  );
+  const fillColor   = percentile >= 50 ? "#C6FF00" : percentile >= 25 ? "#F5A623" : "#E8634A";
+  const shadowColor = percentile >= 50 ? "#3DB87A"  : percentile >= 25 ? "#E8634A" : "#FF2D2D";
+  const glowColor   = percentile >= 50 ? "rgba(198,255,0,0.4)" : percentile >= 25 ? "rgba(245,166,35,0.35)" : "rgba(255,45,45,0.35)";
+  return (
+    <div className="percentile-wrap">
+      <div className="percentile-label-top">better than</div>
+      <svg className="percentile-number-svg percentile-bounce" viewBox="0 0 220 90"
+        style={{filter:`drop-shadow(0 0 16px ${glowColor})`}}
+        aria-label={`${percentile} percent of players`}>
+        <text x="112" y="76" textAnchor="middle" fontFamily="'Righteous',cursive" fontSize="82" fill={shadowColor} opacity="0.55">{displayed}%</text>
+        <text x="110" y="73" textAnchor="middle" fontFamily="'Righteous',cursive" fontSize="82" fill={fillColor} stroke="#2D2A5E" strokeWidth="1">{displayed}%</text>
+      </svg>
+      <div className="percentile-label-bot">of players</div>
+    </div>
+  );
+}
+
 // ─── END SCREEN ───────────────────────────────────────────────────────────────
 function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percentile }) {
   const avg = (avgProp !== null && avgProp !== undefined) ? avgProp : (avgDeviation(guesses) ?? 0);
@@ -1291,28 +1330,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
                 size="end" colorMode="normal" animClass="number-arrive"
               />
             </div>
-            <div style={{textAlign:"center",marginBottom:4,minHeight:28}}>
-              {percentile === null && (
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
-                  calculating rank…
-                </span>
-              )}
-              {percentile !== null && percentile >= 0 && (
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,color:"var(--color-amber)",letterSpacing:"0.02em"}}>
-                  Better than {percentile}% of players
-                </span>
-              )}
-              {percentile === -1 && (
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
-                  you're one of the first players
-                </span>
-              )}
-              {percentile === -2 && (
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
-                  rank unavailable
-                </span>
-              )}
-            </div>
+            <PercentileReveal percentile={percentile} />
             <div className="end-highlights">
               <HighlightCard data={best} type="best" />
             </div>
@@ -1517,3 +1535,4 @@ export default function App() {
     </>
   );
 }
+
