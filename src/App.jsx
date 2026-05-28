@@ -1450,6 +1450,7 @@ export default function App() {
     // Skip title — go straight to first question of new round
     finalGuessesRef.current = [];
     lastGuessRef.current = null;
+    qIndexRef.current = 0;
     const r = buildRound(questions);
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
