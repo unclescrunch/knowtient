@@ -173,7 +173,7 @@ function playEndChime() {
 // ─── SHARE IMAGE GENERATOR ────────────────────────────────────────────────────
 // Always 1080x1080. Layout: logo → tagline → highlight card → avg+% → CTA
 // Dynamic font sizing: question/answer shrink to fit, nothing ever overflows.
-function drawShareCanvas(avg, guesses, round) {
+function drawShareCanvas(avg, guesses, round, percentile) {
   const W = 1080, H = 1080;
   const canvas = document.createElement("canvas");
   const dpr = 2;
@@ -248,13 +248,15 @@ function drawShareCanvas(avg, guesses, round) {
   logoW(".com",CSIZ,cxP,COM_BL,3,3);
 
   // ── Body font ──
-  const L1="Guess what % of Americans knew the answers to";
-  const L2="seven common questions.";
-  const INTRO="My average guess was off by:";
+  const L1="Thousands of Americans answered seven real questions.";
+  const L2="Guess what % answered correctly.";
+  const INTRO=(percentile !== null && percentile !== undefined && percentile >= 0)
+    ? `I guessed better than ${percentile}% of other Knowtient players.`
+    : "Play along at Knowtient.com";
   let bfSz=30;
   while(bfSz>16){
     ctx.font=`bold ${bfSz}px 'Space Grotesk',sans-serif`;
-    if(Math.max(ctx.measureText(L1).width,ctx.measureText(INTRO).width)<=IW)break;
+    if(ctx.measureText(L1).width<=IW)break;
     bfSz--;
   }
   const BF=`bold ${bfSz}px 'Space Grotesk',sans-serif`;
@@ -290,7 +292,7 @@ function drawShareCanvas(avg, guesses, round) {
   const F_L=`bold 26px 'Space Grotesk',sans-serif`;
   const qLines=wrapL(cardQ,F_Q,ICW);
   const aLines=wrapL(cardA,F_A,ICW);
-  const TAG_H=42,Q_H=qLines.length*(qSz+7)+8,A_H=aLines.length*(aSz+6)+10,NUM_H=156;
+  const TAG_H=54,Q_H=qLines.length*(qSz+7)+8,A_H=aLines.length*(aSz+6)+10,NUM_H=156;
   const card_h=PIN+TAG_H+Q_H+A_H+NUM_H+PIN;
 
   // ── Fixed minimum gaps — no overlap ever ──
@@ -312,7 +314,7 @@ function drawShareCanvas(avg, guesses, round) {
 
   // Card
   rr(PAD,y,IW,card_h,14,"#363375","#3DB87A",3);
-  let cy=y+PIN;
+  let cy=y+PIN+10;  // extra top padding inside card
   ctx.font=F_TAG;ctx.fillStyle="#3DB87A";ctx.textAlign="left";
   ctx.fillText("★ MY CLOSEST GUESS",PAD+PIN,cy);cy+=TAG_H;
   cy=drawLL(qLines,F_Q,PAD+PIN,cy,"#F5F0E8",qSz+7);cy+=8;
@@ -359,14 +361,15 @@ function drawShareCanvas(avg, guesses, round) {
   ctx.drawImage(sc,0,0,W,H);
   ctx.restore();
   rr(BX+3,BY+3,BW-6,BH-6,R-2,null,"rgba(180,100,5,0.8)",2);
-  let ctaSz=Math.max(28,Math.floor((BH-40)*0.72));
-  while(ctaSz>20){ctx.font=`bold ${ctaSz}px 'Space Grotesk',sans-serif`;if(ctx.measureText("Can you beat me?").width<=BW-64)break;ctaSz-=2;}
+  const CTA_TEXT="Beat my score at KNOWTIENT.com";
+  let ctaSz=Math.max(22,Math.floor((BH-40)*0.72));
+  while(ctaSz>16){ctx.font=`bold ${ctaSz}px 'Space Grotesk',sans-serif`;if(ctx.measureText(CTA_TEXT).width<=BW-64)break;ctaSz-=2;}
   ctx.font=`bold ${ctaSz}px 'Space Grotesk',sans-serif`;
-  const ctaM=ctx.measureText("Can you beat me?");
+  const ctaM=ctx.measureText(CTA_TEXT);
   const ctaA=ctaM.actualBoundingBoxAscent||ctaSz*0.72;
   const ctaD=ctaM.actualBoundingBoxDescent||ctaSz*0.18;
   ctx.fillStyle="#F5F0E8";ctx.textAlign="center";
-  ctx.fillText("Can you beat me?",W/2,BY+Math.round((BH+ctaA-ctaD)/2));
+  ctx.fillText(CTA_TEXT,W/2,BY+Math.round((BH+ctaA-ctaD)/2));
   ctx.textAlign="left";
 
   return canvas.toDataURL("image/png");
@@ -1261,14 +1264,14 @@ function PercentileReveal({ percentile }) {
   const glowColor   = percentile >= 50 ? "rgba(198,255,0,0.4)" : percentile >= 25 ? "rgba(245,166,35,0.35)" : "rgba(255,45,45,0.35)";
   return (
     <div className="percentile-wrap">
-      <div className="percentile-label-top">better than</div>
+      <div className="percentile-label-top">That's better than</div>
       <svg className="percentile-number-svg percentile-bounce" viewBox="0 0 220 90"
         style={{filter:`drop-shadow(0 0 16px ${glowColor})`}}
         aria-label={`${percentile} percent of players`}>
         <text x="112" y="76" textAnchor="middle" fontFamily="'Righteous',cursive" fontSize="82" fill={shadowColor} opacity="0.55">{displayed}%</text>
         <text x="110" y="73" textAnchor="middle" fontFamily="'Righteous',cursive" fontSize="82" fill={fillColor} stroke="#2D2A5E" strokeWidth="1">{displayed}%</text>
       </svg>
-      <div className="percentile-label-bot">of players</div>
+      <div className="percentile-label-bot">of other Knowtient players.</div>
     </div>
   );
 }
@@ -1298,7 +1301,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
     const cls = deltaColorClass(data.delta);
     return (
       <div className={`highlight-card ${type}`}>
-        <div className={`highlight-tag ${type}`}>{type==="best"?"★ YOUR BEST GUESS":"✗ YOUR WORST GUESS"}</div>
+        <div className={`highlight-tag ${type}`}>{type==="best"?"★ YOUR CLOSEST GUESS":"✗ YOUR WORST GUESS"}</div>
         <div className="highlight-question">{data.q.question}</div>
         <div className="highlight-answer">Correct answer: <span>{data.q.correct_answer}</span></div>
         <div className="highlight-nums" style={{justifyContent:"center",gap:32}}>
@@ -1338,10 +1341,10 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
               {isMobile() ? (
                 <button className="btn-secondary" onClick={async () => {
                   const avgVal = avg || 0;
-                  const pctLine = (percentile !== null && percentile >= 0) ? `I guessed better than ${percentile}% of people. ` : "";
-                  const txt = `Seven common questions. Thousands of Americans surveyed. Guess what % knew the right answers. ${pctLine}www.Knowtient.com`;
+                  const pctLine = (percentile !== null && percentile >= 0) ? `I guessed better than ${percentile}% of other Knowtient players. ` : "";
+                  const txt = `Thousands of Americans answered seven real questions. Guess what % answered correctly. ${pctLine}www.Knowtient.com`;
                   try {
-                    const dataUrl = drawShareCanvas(avgVal, guesses, round);
+                    const dataUrl = drawShareCanvas(avgVal, guesses, round, percentile);
                     const file = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
                     if (navigator.share && navigator.canShare({ files: [file] })) {
                       await navigator.share({ files: [file], text: txt });
@@ -1364,18 +1367,18 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
 }
 
 // ─── SHARE CARD (desktop: preview + SAVE RESULTS) ───────────────────────────
-function ShareCard({ guesses, round, onClose }) {
+function ShareCard({ guesses, round, onClose, percentile }) {
   const avg = avgDeviation(guesses);
   const [status,  setStatus]  = useState("");
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
-    setPreview(drawShareCanvas(avg, guesses, round));
+    setPreview(drawShareCanvas(avg, guesses, round, percentile));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = () => {
-    downloadDataUrl(drawShareCanvas(avg, guesses, round), "Knowtient Game Score.png");
+    downloadDataUrl(drawShareCanvas(avg, guesses, round, percentile), "Knowtient Game Score.png");
     setStatus("Saved!");
   };
 
@@ -1534,7 +1537,7 @@ export default function App() {
             <EndScreen round={round} guesses={finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses)} percentile={percentile} />
           )}
         </div>
-        {showShare && !isMobile() && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} />}
+        {showShare && !isMobile() && <ShareCard guesses={guesses} round={round} onClose={() => setShowShare(false)} percentile={percentile} />}
       </div>
     </>
   );
