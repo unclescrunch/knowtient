@@ -5,8 +5,8 @@ import questionsData from "./pew-questions-v4.json";
 const seenIds = new Set();
 
 // ── Supabase score DB ──────────────────────────────────────────────────────────
-const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL;
-const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL  || "https://ebledybmljqfmhzzigjp.supabase.co";
+const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVibGVkeWJtbGpxZm1oenppZ2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDk5NTYsImV4cCI6MjA5NTQ4NTk1Nn0.MPhtpU6z-UNqaI3m50glmCRGsBuMGNWok-khTnWVTiw";
 
 async function saveScore(avg) {
   try {
