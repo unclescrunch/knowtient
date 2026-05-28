@@ -328,40 +328,44 @@ function drawShareCanvas(avg, guesses, round, percentile) {
   ctx.textAlign="left";
   y+=card_h+gap;
 
-  // Rank block: "I guessed better than / [BIG %] / of other Knowtient players."
-  // Falls back to avg if no percentile
+  // Rank block — fixed proportions, no actualBoundingBox (unreliable on offscreen canvas)
+  // Space Grotesk bold: cap height ≈ 72% of font size, descent ≈ 12%
+  // So visual height of number ≈ font_size * 0.84
   const hasRank = percentile !== null && percentile !== undefined && percentile >= 0;
+  const BOTTOM_PAD = 32;
+  const CTA_BLOCK  = 108 + BOTTOM_PAD;
+  const TWO_LABELS = LH * 2 + 24; // top + bottom label + gaps
+  const availForNum = H - y - CTA_BLOCK - TWO_LABELS;
+  // Cap rank number at whatever space remains, max 120px
+  const rankNumH = Math.min(120, Math.max(60, availForNum));
+  const CAP_RATIO  = 0.72;  // cap height / font size for Space Grotesk bold
+  const DES_RATIO  = 0.12;  // descent / font size
+  const rankCapH   = Math.round(rankNumH * CAP_RATIO);   // visual height above baseline
+  const rankDesH   = Math.round(rankNumH * DES_RATIO);   // visual height below baseline
+  const rankVisH   = rankCapH + rankDesH;                 // total visual height
+  const rankGap    = Math.round((availForNum - rankVisH) / 2); // equal space above/below
+
   if (hasRank) {
     const rankStr = `${percentile}%`;
-    const rankNumH = 130;
-    // Measure actual ascent/descent so we can truly center the number visually
+    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + Math.max(8, rankGap);
     ctx.font = `bold ${rankNumH}px 'Space Grotesk',sans-serif`;
-    const rankM = ctx.measureText(rankStr);
-    const rankAsc = rankM.actualBoundingBoxAscent  || rankNumH * 0.78;
-    const rankDes = rankM.actualBoundingBoxDescent || rankNumH * 0.14;
-    const rankVisH = rankAsc + rankDes;  // actual pixel height of the glyph
-    const rankGap = 20;  // gap between label and top of glyph
-
-    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + rankGap;
-    // Baseline = y + rankAsc (so glyph top is exactly at y)
     const rw = ctx.measureText(rankStr).width, rnx = Math.round((W-rw)/2);
-    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+rankAsc+8);
-    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx,   y+rankAsc);
-    y += rankVisH + rankGap;
+    // Baseline = y + rankCapH (visual top of glyph lands at y)
+    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+rankCapH+8);
+    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx,   y+rankCapH);
+    y += rankVisH + Math.max(8, rankGap);
     ctr("of other Knowtient players.", BF, W/2, y, "#C8C3B8"); y += LH + gap;
   } else {
-    // No rank yet — show avg as before
     ctr(INTRO, BF, W/2, y, "#C8C3B8"); y += LH + 16;
-    ctx.font = `bold 130px 'Space Grotesk',sans-serif`;
+    ctx.font = `bold ${rankNumH}px 'Space Grotesk',sans-serif`;
     const avgStr = `${avg.toFixed(1)}%`;
     const aw = ctx.measureText(avgStr).width, nx = Math.round((W-aw)/2);
-    ctx.fillStyle = "#E8634A"; ctx.fillText(avgStr, nx+8, y+130+8);
-    ctx.fillStyle = "#F5A623"; ctx.fillText(avgStr, nx, y+130);
-    y += 138 + gap;
+    ctx.fillStyle = "#E8634A"; ctx.fillText(avgStr, nx+8, y+rankCapH+8);
+    ctx.fillStyle = "#F5A623"; ctx.fillText(avgStr, nx,   y+rankCapH);
+    y += rankVisH + gap;
   }
 
-  // CTA — alternating stripes, with bottom padding
-  const BOTTOM_PAD=32;
+  // CTA — alternating stripes, pinned with bottom padding
   const BX=PAD,BY=y,BW=IW,BH=Math.min(108, H-y-BOTTOM_PAD),R=14;
   const sc=document.createElement("canvas");
   sc.width=W*dpr;sc.height=H*dpr;
