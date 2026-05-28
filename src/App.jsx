@@ -1077,7 +1077,6 @@ shuffledChoices.current = moveToEnd(shuffled);
         </div>
         <div className="q-text">{question.question}</div>
         <div className="answer-choices-wrap">
-          <div className="answer-choices-label">Answer options</div>
           <div className="answer-choices">
             {shuffledChoices.current.map((choice, i) => (
               <div key={i} className={`answer-choice ${i < visibleChoices ? "animate-in" : ""}`}>
@@ -1299,7 +1298,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
     const cls = deltaColorClass(data.delta);
     return (
       <div className={`highlight-card ${type}`}>
-        <div className={`highlight-tag ${type}`}>{type==="best"?"★ MY CLOSEST GUESS":"✗ MY WORST GUESS"}</div>
+        <div className={`highlight-tag ${type}`}>{type==="best"?"★ YOUR BEST GUESS":"✗ YOUR WORST GUESS"}</div>
         <div className="highlight-question">{data.q.question}</div>
         <div className="highlight-answer">Correct answer: <span>{data.q.correct_answer}</span></div>
         <div className="highlight-nums" style={{justifyContent:"center",gap:32}}>
@@ -1339,7 +1338,8 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
               {isMobile() ? (
                 <button className="btn-secondary" onClick={async () => {
                   const avgVal = avg || 0;
-                  const txt = `Seven common questions. Thousands of Americans surveyed. Guess what % knew the right answers. My average guess was off by ${avgVal.toFixed(1)}%. www.Knowtient.com`;
+                  const pctLine = (percentile !== null && percentile >= 0) ? `I guessed better than ${percentile}% of people. ` : "";
+                  const txt = `Seven common questions. Thousands of Americans surveyed. Guess what % knew the right answers. ${pctLine}www.Knowtient.com`;
                   try {
                     const dataUrl = drawShareCanvas(avgVal, guesses, round);
                     const file = dataUrlToFile(dataUrl, "Knowtient Game Score.png");
@@ -1435,11 +1435,15 @@ export default function App() {
   const [percentile,  setPercentile]  = useState(null);
   const questions = questionsData.questions;
 
-  // Enter key fires primary action for current screen
+  // Enter key fires primary action — debounced to prevent double-fire during transitions
   useEffect(() => {
+    let lastFired = 0;
     const handleKey = (e) => {
       if (e.key !== "Enter") return;
       if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+      const now = Date.now();
+      if (now - lastFired < 350) return;  // debounce: ignore within 350ms of last fire
+      lastFired = now;
       if (screen === "splash")   document.querySelector(".btn-primary")?.click();
       if (screen === "question") document.querySelector(".btn-primary:not(:disabled)")?.click();
       if (screen === "reveal")   document.querySelector(".btn-primary.large")?.click();
@@ -1535,4 +1539,3 @@ export default function App() {
     </>
   );
 }
-
