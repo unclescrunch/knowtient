@@ -11,7 +11,6 @@ const SUPA_URL  = (_RAW_URL  && _RAW_URL  !== "undefined") ? _RAW_URL  : "https:
 const SUPA_KEY  = (_RAW_KEY  && _RAW_KEY  !== "undefined") ? _RAW_KEY  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVibGVkeWJtbGpxZm1oenppZ2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDk5NTYsImV4cCI6MjA5NTQ4NTk1Nn0.MPhtpU6z-UNqaI3m50glmCRGsBuMGNWok-khTnWVTiw";
 
 async function saveScore(avg) {
-  console.log("saveScore called with avg:", avg, "URL:", SUPA_URL ? "set" : "missing", "KEY:", SUPA_KEY ? "set" : "missing");
   try {
     const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
       method: "POST",
@@ -53,7 +52,6 @@ async function fetchPercentile(avg) {
     };
     const worseCount = parseCR(worseRes);
     const totalCount = parseCR(totalRes);
-    console.log(`Percentile debug — total:${totalCount} worse:${worseCount} avg:${avgRounded}`);
     if (totalCount < 5) return -1; // threshold: need 5+ scores for meaningful rank
     return Math.round((worseCount / totalCount) * 100);
   } catch (e) { console.warn("Percentile fetch error", e); return -2; }
