@@ -5,17 +5,14 @@ import questionsData from "./pew-questions-v4.json";
 const seenIds = new Set();
 
 // ── Supabase score DB ──────────────────────────────────────────────────────────
-const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL  || "https://ebledybmljqfmhzzigjp.supabase.co";
-const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVibGVkeWJtbGpxZm1oenppZ2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDk5NTYsImV4cCI6MjA5NTQ4NTk1Nn0.MPhtpU6z-UNqaI3m50glmCRGsBuMGNWok-khTnWVTiw";
+const _RAW_URL  = import.meta.env.VITE_SUPABASE_URL;
+const _RAW_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPA_URL  = (_RAW_URL  && _RAW_URL  !== "undefined") ? _RAW_URL  : "https://ebledybmljqfmhzzigjp.supabase.co";
+const SUPA_KEY  = (_RAW_KEY  && _RAW_KEY  !== "undefined") ? _RAW_KEY  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVibGVkeWJtbGpxZm1oenppZ2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDk5NTYsImV4cCI6MjA5NTQ4NTk1Nn0.MPhtpU6z-UNqaI3m50glmCRGsBuMGNWok-khTnWVTiw";
 
 async function saveScore(avg) {
+  console.log("saveScore called with avg:", avg, "URL:", SUPA_URL ? "set" : "missing", "KEY:", SUPA_KEY ? "set" : "missing");
   try {
-    if (!SUPA_URL || !SUPA_KEY) {
-      // Env vars missing — surface visibly so it's obvious in any environment
-      document.title = "⚠ SUPA ENV MISSING";
-      return;
-    }
-    const payload = { avg_off: parseFloat(avg.toFixed(1)) };
     const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
       method: "POST",
       headers: {
@@ -24,15 +21,10 @@ async function saveScore(avg) {
         "Authorization": `Bearer ${SUPA_KEY}`,
         "Prefer": "return=minimal",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ avg_off: parseFloat(avg.toFixed(1)) }),
     });
-    if (!res.ok) {
-      const text = await res.text();
-      document.title = `⚠ INSERT ${res.status}: ${text.slice(0,60)}`;
-    }
-  } catch (e) {
-    document.title = `⚠ INSERT ERR: ${String(e).slice(0,60)}`;
-  }
+    if (!res.ok) console.warn("Score insert failed", res.status);
+  } catch (e) { console.warn("Score insert error", e); }
 }
 
 async function fetchPercentile(avg) {
