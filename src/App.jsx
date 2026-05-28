@@ -4,7 +4,6 @@ import questionsData from "./pew-questions-v4.json";
 // ─── SEEN QUESTIONS ───────────────────────────────────────────────────────────
 const seenIds = new Set();
 
-// ── Score database: persists top scores in localStorage ──
 // ── Supabase score DB ──────────────────────────────────────────────────────────
 const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -30,35 +29,30 @@ async function fetchPercentile(avg) {
   // What % of all scores are WORSE (higher) than this score?
   try {
     const avgRounded = parseFloat(avg.toFixed(1));
-    // Count scores worse than mine
-    const worseRes = await fetch(
-      `${SUPA_URL}/rest/v1/scores?avg_off=gt.${avgRounded}&select=id`,
-      {
-        headers: {
-          "apikey": SUPA_KEY,
-          "Authorization": `Bearer ${SUPA_KEY}`,
-          "Prefer": "count=exact",
-          "Range": "0-0",
-        },
-      }
-    );
-    // Count total scores
-    const totalRes = await fetch(
-      `${SUPA_URL}/rest/v1/scores?select=id`,
-      {
-        headers: {
-          "apikey": SUPA_KEY,
-          "Authorization": `Bearer ${SUPA_KEY}`,
-          "Prefer": "count=exact",
-          "Range": "0-0",
-        },
-      }
-    );
-    const worseCount = parseInt(worseRes.headers.get("Content-Range")?.split("/")[1] || "0");
-    const totalCount = parseInt(totalRes.headers.get("Content-Range")?.split("/")[1] || "1");
-    if (totalCount < 2) return null; // not enough data yet
+    const headers = {
+      "apikey": SUPA_KEY,
+      "Authorization": `Bearer ${SUPA_KEY}`,
+      "Prefer": "count=exact",
+      "Range": "0-0",
+    };
+    // Run both counts in parallel
+    const [worseRes, totalRes] = await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/scores?avg_off=gt.${avgRounded}&select=id`, { headers }),
+      fetch(`${SUPA_URL}/rest/v1/scores?select=id`, { headers }),
+    ]);
+    const parseCR = (res) => {
+      const cr = res.headers.get("Content-Range"); // e.g. "0-0/42" or "*/0"
+      if (!cr) return 0;
+      const parts = cr.split("/");
+      const n = parseInt(parts[parts.length - 1]);
+      return isNaN(n) ? 0 : n;
+    };
+    const worseCount = parseCR(worseRes);
+    const totalCount = parseCR(totalRes);
+    // Need at least 2 scores for a meaningful percentile
+    if (totalCount < 2) return -1; // sentinel: "first player" state
     return Math.round((worseCount / totalCount) * 100);
-  } catch (e) { console.warn("Percentile fetch error", e); return null; }
+  } catch (e) { console.warn("Percentile fetch error", e); return -2; } // sentinel: error state
 }
 
 // ─── MOBILE DETECTION ────────────────────────────────────────────────────────
@@ -805,21 +799,25 @@ function buildRound(allQuestions) {
   const worldQs     = filtered.filter(q => q.category === 'world');
   const otherQs     = filtered.filter(q => q.category !== 'religion' && q.category !== 'world');
 
-  // Order: world first (slot 0), then others (slots 1-2), religion (slot 3),
-  // others (slots 4-5), religion (slot 6)
+  // Build ordered result — world first, religion at slots 3 and 6, others fill remaining slots.
+  // Use a consumed-set to guarantee no duplicates regardless of fallbacks.
+  const consumed = new Set();
+  const take = (arr) => {
+    const q = arr.find(x => x && !consumed.has(x.id));
+    if (q) consumed.add(q.id);
+    return q || null;
+  };
   const result = [
-    worldQs[0]  || otherQs[0],
-    otherQs[0]  || otherQs[1],
-    otherQs[1]  || otherQs[2],
-    religionQs[0],
-    otherQs[2]  || otherQs[3],
-    otherQs[3]  || otherQs[4],
-    religionQs[1],
+    take(worldQs)   || take(otherQs),   // slot 0: world preferred
+    take(otherQs),                        // slot 1
+    take(otherQs),                        // slot 2
+    take(religionQs),                     // slot 3: religion
+    take(otherQs),                        // slot 4
+    take(otherQs),                        // slot 5
+    take(religionQs),                     // slot 6: religion
   ].filter(Boolean);
 
-  // Deduplicate in case of fallback collisions
-  const seen = new Set();
-  const deduped = result.filter(q => { if (!q || seen.has(q.id)) return false; seen.add(q.id); return true; });
+  const deduped = result; // take() guarantees no duplicates already
 
   deduped.forEach(q => seenIds.add(q.id));
   return deduped;
@@ -1111,7 +1109,8 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
   const [barWave,   setBarWave]   = useState(false);
 
   const realPct = question.pct_correct;
-  const delta   = Math.abs(guess - realPct);
+  const safeGuess = guess ?? 50;  // null guard — defaults to 50 if somehow null
+  const delta   = Math.abs(safeGuess - realPct);
   const isClose = delta <= 10;
   const isFail  = delta >= 20;
   const colorMode = isClose ? "close" : isFail ? "fail" : "normal";
@@ -1135,7 +1134,7 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const markerLeft = Math.min(Math.max(guess, 2), 98);
+  const markerLeft = Math.min(Math.max(safeGuess, 2), 98);
   const barColor   = isClose ? "#C6FF00" : isFail ? "#FF2D2D" : "#F5A623";
   const screenBg   = isClose
     ? "linear-gradient(180deg,#0d3320 0%,#1a4a2e 100%)"
@@ -1163,7 +1162,7 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
             <div className="reveal-bar-track">
               <div className={`reveal-bar-fill${barWave?" wave-go":""}`} style={{width:runCount?`${realPct}%`:"0%",background:barColor}} />
               <div className="reveal-guess-marker" style={{left:`calc(${markerLeft}% - 2.5px)`}}>
-                <div className="reveal-guess-marker-label" style={{left:"50%"}}>you: {guess}%</div>
+                <div className="reveal-guess-marker-label" style={{left:"50%"}}>you: {safeGuess}%</div>
               </div>
             </div>
             <div className="reveal-bar-reality-label">reality: {realPct}%</div>
@@ -1236,7 +1235,7 @@ function DebriefModal({ round, guesses, onClose }) {
 
 // ─── END SCREEN ───────────────────────────────────────────────────────────────
 function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percentile }) {
-  const avg = avgProp ?? avgDeviation(guesses);
+  const avg = (avgProp !== null && avgProp !== undefined) ? avgProp : (avgDeviation(guesses) ?? 0);
   const [run, setRun]               = useState(false);
   const [showDebrief, setShowDebrief] = useState(false);
   const displayed = useCountUp(parseFloat(avg.toFixed(1)), 1200, run);
@@ -1259,7 +1258,7 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
     const cls = deltaColorClass(data.delta);
     return (
       <div className={`highlight-card ${type}`}>
-        <div className={`highlight-tag ${type}`}>{type==="best"?"★ YOUR BEST GUESS":"✗ YOUR WORST GUESS"}</div>
+        <div className={`highlight-tag ${type}`}>{type==="best"?"★ MY CLOSEST GUESS":"✗ MY WORST GUESS"}</div>
         <div className="highlight-question">{data.q.question}</div>
         <div className="highlight-answer">Correct answer: <span>{data.q.correct_answer}</span></div>
         <div className="highlight-nums" style={{justifyContent:"center",gap:32}}>
@@ -1291,13 +1290,24 @@ function EndScreen({ round, guesses, onPlayAgain, onShare, avg: avgProp, percent
               />
             </div>
             <div style={{textAlign:"center",marginBottom:4,minHeight:28}}>
-              {percentile !== null ? (
+              {percentile === null && (
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
+                  calculating rank…
+                </span>
+              )}
+              {percentile !== null && percentile >= 0 && (
                 <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,color:"var(--color-amber)",letterSpacing:"0.02em"}}>
                   Better than {percentile}% of players
                 </span>
-              ) : (
+              )}
+              {percentile === -1 && (
                 <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
-                  calculating rank…
+                  you're one of the first players
+                </span>
+              )}
+              {percentile === -2 && (
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:"var(--color-secondary)"}}>
+                  rank unavailable
                 </span>
               )}
             </div>
@@ -1456,7 +1466,8 @@ export default function App() {
       const finalAvg = avgDeviation(newGuesses);
       setPercentile(null);
       setScreen("end");
-      saveScore(finalAvg).then(() => fetchPercentile(finalAvg).then(p => setPercentile(p)));
+      // Small delay lets Supabase commit the insert before we count
+      saveScore(finalAvg).then(() => new Promise(r => setTimeout(r, 800))).then(() => fetchPercentile(finalAvg)).then(p => setPercentile(p));
       return;
     }
     setGuesses(newGuesses);
