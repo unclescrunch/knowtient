@@ -9,6 +9,7 @@ const _RAW_URL  = import.meta.env.VITE_SUPABASE_URL;
 const _RAW_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPA_URL  = (_RAW_URL  && _RAW_URL  !== "undefined") ? _RAW_URL  : "https://ebledybmljqfmhzzigjp.supabase.co";
 const SUPA_KEY  = (_RAW_KEY  && _RAW_KEY  !== "undefined") ? _RAW_KEY  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVibGVkeWJtbGpxZm1oenppZ2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDk5NTYsImV4cCI6MjA5NTQ4NTk1Nn0.MPhtpU6z-UNqaI3m50glmCRGsBuMGNWok-khTnWVTiw";
+console.log("ENV CHECK:", import.meta.env.VITE_SUPABASE_URL?.slice(0,20), !!import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 async function saveScore(avg) {
   try {
