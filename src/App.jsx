@@ -9,8 +9,13 @@ const SUPA_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function saveScore(avg) {
-  // Insert score and return percentile in one round-trip
   try {
+    if (!SUPA_URL || !SUPA_KEY) {
+      // Env vars missing — surface visibly so it's obvious in any environment
+      document.title = "⚠ SUPA ENV MISSING";
+      return;
+    }
+    const payload = { avg_off: parseFloat(avg.toFixed(1)) };
     const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
       method: "POST",
       headers: {
@@ -19,40 +24,47 @@ async function saveScore(avg) {
         "Authorization": `Bearer ${SUPA_KEY}`,
         "Prefer": "return=minimal",
       },
-      body: JSON.stringify({ avg_off: parseFloat(avg.toFixed(1)) }),
+      body: JSON.stringify(payload),
     });
-    if (!res.ok) console.warn("Score insert failed", res.status);
-  } catch (e) { console.warn("Score insert error", e); }
+    if (!res.ok) {
+      const text = await res.text();
+      document.title = `⚠ INSERT ${res.status}: ${text.slice(0,60)}`;
+    }
+  } catch (e) {
+    document.title = `⚠ INSERT ERR: ${String(e).slice(0,60)}`;
+  }
 }
 
 async function fetchPercentile(avg) {
   // What % of all scores are WORSE (higher) than this score?
+  // Uses HEAD requests — returns Content-Range header with exact count, no row data sent.
+  // HEAD avoids the Range: 0-0 ambiguity which can return 416 on empty result sets.
   try {
     const avgRounded = parseFloat(avg.toFixed(1));
     const headers = {
       "apikey": SUPA_KEY,
       "Authorization": `Bearer ${SUPA_KEY}`,
       "Prefer": "count=exact",
-      "Range": "0-0",
     };
-    // Run both counts in parallel
     const [worseRes, totalRes] = await Promise.all([
-      fetch(`${SUPA_URL}/rest/v1/scores?avg_off=gt.${avgRounded}&select=id`, { headers }),
-      fetch(`${SUPA_URL}/rest/v1/scores?select=id`, { headers }),
+      fetch(`${SUPA_URL}/rest/v1/scores?avg_off=gt.${avgRounded}&select=id`, { method:"HEAD", headers }),
+      fetch(`${SUPA_URL}/rest/v1/scores?select=id`, { method:"HEAD", headers }),
     ]);
     const parseCR = (res) => {
-      const cr = res.headers.get("Content-Range"); // e.g. "0-0/42" or "*/0"
+      // Content-Range formats: "0-N/total" or "*/total" or "*/0"
+      const cr = res.headers.get("Content-Range");
       if (!cr) return 0;
-      const parts = cr.split("/");
-      const n = parseInt(parts[parts.length - 1]);
+      const after = cr.split("/")[1];
+      if (!after) return 0;
+      const n = parseInt(after, 10);
       return isNaN(n) ? 0 : n;
     };
     const worseCount = parseCR(worseRes);
     const totalCount = parseCR(totalRes);
-    // Need at least 2 scores for a meaningful percentile
-    if (totalCount < 2) return -1; // sentinel: "first player" state
+    console.log(`Percentile debug — total:${totalCount} worse:${worseCount} avg:${avgRounded}`);
+    if (totalCount < 5) return -1; // threshold: need 5+ scores for meaningful rank
     return Math.round((worseCount / totalCount) * 100);
-  } catch (e) { console.warn("Percentile fetch error", e); return -2; } // sentinel: error state
+  } catch (e) { console.warn("Percentile fetch error", e); return -2; }
 }
 
 // ─── MOBILE DETECTION ────────────────────────────────────────────────────────
