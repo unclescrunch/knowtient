@@ -330,14 +330,33 @@ function drawShareCanvas(avg, guesses, round, percentile) {
   ctx.textAlign="left";
   y+=card_h+gap;
 
-  // Avg intro + big number — guaranteed below card
-  ctr(INTRO,BF,W/2,y,"#C8C3B8");y+=LH+16;
-  ctx.font=`bold 130px 'Space Grotesk',sans-serif`;
-  const avgStr=`${avg.toFixed(1)}%`;
-  const aw=ctx.measureText(avgStr).width,nx=Math.round((W-aw)/2);
-  ctx.fillStyle="#E8634A";ctx.fillText(avgStr,nx+8,y+130+8);
-  ctx.fillStyle="#F5A623";ctx.fillText(avgStr,nx,y+130);
-  y+=138+gap;
+  // Rank block: "I guessed better than / [BIG %] / of other Knowtient players."
+  // Falls back to avg if no percentile
+  const hasRank = percentile !== null && percentile !== undefined && percentile >= 0;
+  if (hasRank) {
+    const rankStr = `${percentile}%`;
+    // Top label
+    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + 10;
+    // Big rank number — same SVG shadow treatment
+    ctx.font = `bold 130px 'Space Grotesk',sans-serif`;
+    const rw = ctx.measureText(rankStr).width, rnx = Math.round((W-rw)/2);
+    // Shadow (coral offset)
+    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+130+8);
+    // Main fill (lime — top rank color, always positive framing)
+    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx, y+130);
+    y += 138 + 10;
+    // Bottom label
+    ctr("of other Knowtient players.", BF, W/2, y, "#C8C3B8"); y += LH + gap;
+  } else {
+    // No rank yet — show avg as before
+    ctr(INTRO, BF, W/2, y, "#C8C3B8"); y += LH + 16;
+    ctx.font = `bold 130px 'Space Grotesk',sans-serif`;
+    const avgStr = `${avg.toFixed(1)}%`;
+    const aw = ctx.measureText(avgStr).width, nx = Math.round((W-aw)/2);
+    ctx.fillStyle = "#E8634A"; ctx.fillText(avgStr, nx+8, y+130+8);
+    ctx.fillStyle = "#F5A623"; ctx.fillText(avgStr, nx, y+130);
+    y += 138 + gap;
+  }
 
   // CTA — alternating stripes
   const BX=PAD,BY=y,BW=IW,BH=108,R=14;
