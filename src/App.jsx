@@ -333,16 +333,21 @@ function drawShareCanvas(avg, guesses, round, percentile) {
   const hasRank = percentile !== null && percentile !== undefined && percentile >= 0;
   if (hasRank) {
     const rankStr = `${percentile}%`;
-    // Top label
-    // Rank block: evenly spaced — top label, then number centered, then bottom label
-    const rankNumH = 130;  // font size
-    const rankGap = 18;    // equal gap above and below number
-    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + rankGap;
+    const rankNumH = 130;
+    // Measure actual ascent/descent so we can truly center the number visually
     ctx.font = `bold ${rankNumH}px 'Space Grotesk',sans-serif`;
+    const rankM = ctx.measureText(rankStr);
+    const rankAsc = rankM.actualBoundingBoxAscent  || rankNumH * 0.78;
+    const rankDes = rankM.actualBoundingBoxDescent || rankNumH * 0.14;
+    const rankVisH = rankAsc + rankDes;  // actual pixel height of the glyph
+    const rankGap = 20;  // gap between label and top of glyph
+
+    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + rankGap;
+    // Baseline = y + rankAsc (so glyph top is exactly at y)
     const rw = ctx.measureText(rankStr).width, rnx = Math.round((W-rw)/2);
-    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+rankNumH+8);
-    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx, y+rankNumH);
-    y += rankNumH + rankGap;
+    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+rankAsc+8);
+    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx,   y+rankAsc);
+    y += rankVisH + rankGap;
     ctr("of other Knowtient players.", BF, W/2, y, "#C8C3B8"); y += LH + gap;
   } else {
     // No rank yet — show avg as before
@@ -355,8 +360,9 @@ function drawShareCanvas(avg, guesses, round, percentile) {
     y += 138 + gap;
   }
 
-  // CTA — alternating stripes
-  const BX=PAD,BY=y,BW=IW,BH=108,R=14;
+  // CTA — alternating stripes, with bottom padding
+  const BOTTOM_PAD=32;
+  const BX=PAD,BY=y,BW=IW,BH=Math.min(108, H-y-BOTTOM_PAD),R=14;
   const sc=document.createElement("canvas");
   sc.width=W*dpr;sc.height=H*dpr;
   const sx=sc.getContext("2d");sx.scale(dpr,dpr);
@@ -1513,7 +1519,13 @@ export default function App() {
       const finalAvg = avgDeviation(newGuesses);
       setPercentile(null);
       setScreen("end");
-      saveScore(finalAvg).then(() => new Promise(r => setTimeout(r, 800))).then(() => fetchPercentile(finalAvg)).then(p => setPercentile(p));
+      // Skip saving if all 7 guesses are 50 — test round
+      const isTestRound = newGuesses.every(g => g.guess === 50);
+      if (!isTestRound) {
+        saveScore(finalAvg).then(() => new Promise(r => setTimeout(r, 800))).then(() => fetchPercentile(finalAvg)).then(p => setPercentile(p));
+      } else {
+        fetchPercentile(finalAvg).then(p => setPercentile(p));
+      }
       return;
     }
     setGuesses(newGuesses);
