@@ -334,16 +334,15 @@ function drawShareCanvas(avg, guesses, round, percentile) {
   if (hasRank) {
     const rankStr = `${percentile}%`;
     // Top label
-    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + 10;
-    // Big rank number — same SVG shadow treatment
-    ctx.font = `bold 130px 'Space Grotesk',sans-serif`;
+    // Rank block: evenly spaced — top label, then number centered, then bottom label
+    const rankNumH = 130;  // font size
+    const rankGap = 18;    // equal gap above and below number
+    ctr("I guessed better than", BF, W/2, y, "#C8C3B8"); y += LH + rankGap;
+    ctx.font = `bold ${rankNumH}px 'Space Grotesk',sans-serif`;
     const rw = ctx.measureText(rankStr).width, rnx = Math.round((W-rw)/2);
-    // Shadow (coral offset)
-    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+130+8);
-    // Main fill (lime — top rank color, always positive framing)
-    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx, y+130);
-    y += 138 + 10;
-    // Bottom label
+    ctx.fillStyle = "#E8634A"; ctx.fillText(rankStr, rnx+8, y+rankNumH+8);
+    ctx.fillStyle = "#C6FF00"; ctx.fillText(rankStr, rnx, y+rankNumH);
+    y += rankNumH + rankGap;
     ctr("of other Knowtient players.", BF, W/2, y, "#C8C3B8"); y += LH + gap;
   } else {
     // No rank yet — show avg as before
@@ -1143,7 +1142,7 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
   const isFail  = delta >= 20;
   const colorMode = isClose ? "close" : isFail ? "fail" : "normal";
   const cls       = deltaColorClass(delta);
-  const countedValue = useCountUp(realPct, 1400, runCount);
+  const countedValue = useCountUp(Math.round(realPct), 1400, runCount);
 
   useEffect(() => {
     const t1 = setTimeout(() => setRunCount(true), 120);
@@ -1182,9 +1181,9 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
               <div className="reveal-answer-card-text">{question.correct_answer}</div>
             </div>
           </div>
-          <div className="reveal-top-label">REAL KNOWTIENT</div>
+          <div className="reveal-top-label">REAL % WHO KNEW</div>
           <div className="reveal-big-number-wrap">
-            <BigNumber value={countedValue} size="full" colorMode={colorMode} animClass={numClass} />
+            <BigNumber value={Math.round(countedValue)} size="full" colorMode={colorMode} animClass={numClass} />
           </div>
           <div className="reveal-bar-section">
             <div className="reveal-bar-track">
@@ -1281,7 +1280,7 @@ function PercentileReveal({ percentile }) {
   const glowColor   = percentile >= 50 ? "rgba(198,255,0,0.4)" : percentile >= 25 ? "rgba(245,166,35,0.35)" : "rgba(255,45,45,0.35)";
   return (
     <div className="percentile-wrap">
-      <div className="percentile-label-top">That's better than</div>
+      <div className="percentile-label-top">YOU GUESSED CLOSER THAN</div>
       <svg className="percentile-number-svg percentile-bounce" viewBox="0 0 220 90"
         style={{filter:`drop-shadow(0 0 16px ${glowColor})`}}
         aria-label={`${percentile} percent of players`}>
