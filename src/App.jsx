@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import questionsData from "./pew-questions-v4.json";
 
 // ─── SEEN QUESTIONS ───────────────────────────────────────────────────────────
@@ -1560,6 +1561,7 @@ export default function App() {
 
   return (
     <>
+      <Analytics />
       <GlobalStyles />
       <div className="app-shell">
         {showTitleBar && (
