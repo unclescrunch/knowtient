@@ -747,7 +747,7 @@ const REGIONAL_RELIGION_IDS = new Set(['pew_intl_2022_003']);
 const OMIT_IDS     = new Set(['pew_sci_2019_002']); // ear infection — omitted permanently
 const JUDAISM_IDS  = new Set(['pew_religion_2019_007','pew_religion_2019_017','pew_religion_2019_020','pew_religion_2019_023','pew_religion_2019_030']);
 
-function buildRound(allQuestions) {
+function buildRound(allQuestions, _depth=0) {
   const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
   const unflagged = allQuestions.filter(q => !q.flagged && !q.image_dependent && !OMIT_IDS.has(q.id));
 
@@ -857,6 +857,16 @@ function buildRound(allQuestions) {
 
   const deduped = result; // take() guarantees no duplicates already
 
+  // If we got fewer than 7 questions, reset seenIds and retry (max 2 retries)
+  if (deduped.length < 7) {
+    if (_depth >= 2) {
+      // Should never happen with 67 questions — return whatever we have
+      console.warn("buildRound: could not fill 7 questions after retries");
+      return deduped;
+    }
+    seenIds.clear();
+    return buildRound(allQuestions, _depth + 1);
+  }
   deduped.forEach(q => seenIds.add(q.id));
   return deduped;
 }
@@ -1516,6 +1526,8 @@ export default function App() {
   const handleNext = useCallback(() => {
     const qi = qIndexRef.current;             // always current — never stale
     const currentGuess = lastGuessRef.current;
+    // Guard: if round[qi] is undefined something went wrong — bail safely to end
+    if (!round[qi]) { console.warn("handleNext: round[qi] undefined, qi=", qi, "round.length=", round.length); setScreen("end"); return; }
     const newGuesses = [...guesses, {guess:currentGuess, real:round[qi].pct_correct}];
     if (qi + 1 >= TOTAL) {
       finalGuessesRef.current = newGuesses;
@@ -1559,10 +1571,10 @@ export default function App() {
         <div className="screen-wrap">
           {screen === "title"    && <TitleScreen onBegin={() => setScreen("splash")} />}
           {screen === "splash"   && <SplashScreen onStart={startRound} />}
-          {screen === "question" && round[qIndex] && (
+          {screen === "question" && round.length > 0 && qIndex < round.length && round[qIndex] && (
             <QuestionScreen key={round[qIndex].id} question={round[qIndex]} onSubmit={handleSubmit} animClass={qAnim} />
           )}
-          {screen === "reveal" && round[qIndex] && (
+          {screen === "reveal" && round.length > 0 && qIndex < round.length && round[qIndex] && (
             <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} />
           )}
           {screen === "end" && (
