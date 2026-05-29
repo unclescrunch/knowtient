@@ -741,7 +741,7 @@ const GlobalStyles = () => (
     /* ══════════════════════════════════════════════════════
        DESKTOP AMBIENT BACKGROUND LAYER
        Hidden on mobile. Reacts to bgState data attribute.
-       All color transitions: 1.5s ease — mood, not UI.
+       Color transitions: 2.5s ease — holds the mood.
     ══════════════════════════════════════════════════════ */
     .desktop-bg {
       display: none; /* mobile: never shown */
@@ -761,47 +761,51 @@ const GlobalStyles = () => (
         inset: 0;
         z-index: 0;
         pointer-events: none;
-        /* Default idle state — neutral base, no color */
+        /* Default idle state — neutral, no color bleed */
         background: radial-gradient(
           ellipse 70% 70% at 50% 50%,
           rgba(45, 42, 94, 0.0) 0%,
           transparent 100%
         );
-        transition: background 1.5s ease, box-shadow 1.5s ease;
+        transition: background 2.5s ease;
       }
 
-      /* close (delta ≤ 10) — green pulse */
+      /* close (delta ≤ 10) — strong green bloom, secondary lime edge */
       .desktop-bg[data-bgstate="close"] {
         background:
-          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(61, 184, 122, 0.13) 0%, transparent 65%),
-          radial-gradient(ellipse 50% 50% at 30% 70%, rgba(198, 255, 0, 0.07) 0%, transparent 60%);
+          radial-gradient(ellipse 110% 100% at 50% 50%, rgba(61, 184, 122, 0.28) 0%, transparent 60%),
+          radial-gradient(ellipse 70%  60%  at 20% 80%, rgba(198, 255, 0, 0.18) 0%, transparent 55%),
+          radial-gradient(ellipse 50%  50%  at 80% 20%, rgba(198, 255, 0, 0.12) 0%, transparent 50%);
       }
 
-      /* notbad (delta 11–19) — amber warmth */
+      /* notbad (delta 11–19) — warm amber wash */
       .desktop-bg[data-bgstate="notbad"] {
         background:
-          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(245, 166, 35, 0.12) 0%, transparent 65%),
-          radial-gradient(ellipse 40% 40% at 70% 30%, rgba(245, 166, 35, 0.06) 0%, transparent 55%);
+          radial-gradient(ellipse 110% 100% at 50% 50%, rgba(245, 166, 35, 0.24) 0%, transparent 60%),
+          radial-gradient(ellipse 60%  50%  at 75% 25%, rgba(245, 166, 35, 0.14) 0%, transparent 55%),
+          radial-gradient(ellipse 50%  60%  at 25% 75%, rgba(232, 99, 74, 0.08)  0%, transparent 50%);
       }
 
-      /* off (delta ≥ 20) — coral edge bleed */
+      /* off (delta ≥ 20) — coral bleed, red corners */
       .desktop-bg[data-bgstate="off"] {
         background:
-          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(232, 99, 74, 0.13) 0%, transparent 65%),
-          radial-gradient(ellipse 40% 50% at 20% 80%, rgba(255, 45, 45, 0.06) 0%, transparent 55%);
+          radial-gradient(ellipse 110% 100% at 50% 50%, rgba(232, 99, 74, 0.28) 0%, transparent 60%),
+          radial-gradient(ellipse 60%  60%  at 10% 90%, rgba(255, 45, 45, 0.18) 0%, transparent 55%),
+          radial-gradient(ellipse 50%  50%  at 90% 10%, rgba(255, 45, 45, 0.12) 0%, transparent 50%);
       }
 
-      /* end — slow lime/amber pulse via animation */
+      /* end — lime/amber pulse, full coverage */
       .desktop-bg[data-bgstate="end"] {
         background:
-          radial-gradient(ellipse 80% 70% at 50% 60%, rgba(198, 255, 0, 0.10) 0%, transparent 60%),
-          radial-gradient(ellipse 50% 40% at 70% 20%, rgba(245, 166, 35, 0.08) 0%, transparent 55%);
-        animation: endBgPulse 5s ease-in-out infinite;
+          radial-gradient(ellipse 110% 90% at 50% 60%, rgba(198, 255, 0, 0.20) 0%, transparent 55%),
+          radial-gradient(ellipse 60%  50% at 80% 20%, rgba(245, 166, 35, 0.16) 0%, transparent 50%),
+          radial-gradient(ellipse 50%  60% at 20% 80%, rgba(61, 184, 122, 0.12) 0%, transparent 50%);
+        animation: endBgPulse 4s ease-in-out infinite;
       }
 
       @keyframes endBgPulse {
         0%,100% { opacity: 1; }
-        50%      { opacity: 0.55; }
+        50%      { opacity: 0.5; }
       }
 
       /* ── Shell widening ── */
@@ -809,105 +813,163 @@ const GlobalStyles = () => (
         position: relative;
         z-index: 1;
         max-width: 720px;
-        /* Subtle color-matched outer glow on the card — transitions with bgState */
-        transition: box-shadow 1.5s ease;
+        transition: box-shadow 2.5s ease;
       }
 
-      /* Glow states on the shell — matches bg color story */
-      .app-shell.bg-close  { box-shadow: 0 0 80px rgba(61, 184, 122, 0.18), 0 0 200px rgba(61, 184, 122, 0.06); }
-      .app-shell.bg-notbad { box-shadow: 0 0 80px rgba(245, 166, 35, 0.16), 0 0 200px rgba(245, 166, 35, 0.05); }
-      .app-shell.bg-off    { box-shadow: 0 0 80px rgba(232, 99, 74, 0.18),  0 0 200px rgba(232, 99, 74, 0.06); }
-      .app-shell.bg-end    { box-shadow: 0 0 100px rgba(198, 255, 0, 0.14), 0 0 240px rgba(245, 166, 35, 0.07); }
+      /* Shell glow — color-matched, extended radius */
+      .app-shell.bg-close  { box-shadow: 0 0 120px rgba(61, 184, 122, 0.35), 0 0 280px rgba(198, 255, 0, 0.15); }
+      .app-shell.bg-notbad { box-shadow: 0 0 120px rgba(245, 166, 35, 0.32), 0 0 280px rgba(245, 166, 35, 0.12); }
+      .app-shell.bg-off    { box-shadow: 0 0 120px rgba(232, 99, 74, 0.35),  0 0 280px rgba(255, 45, 45, 0.14); }
+      .app-shell.bg-end    { box-shadow: 0 0 140px rgba(198, 255, 0, 0.28),  0 0 320px rgba(245, 166, 35, 0.14); }
 
       /* ── Font bumps — desktop only ── */
+
+      /* Question screen */
+      .q-category-pill { font-size: 20px; }
+      .q-source-label  { font-size: 20px; }
+
       .q-text {
-        font-size: 22px;
-        line-height: 1.35;
+        font-size: 26px;
+        line-height: 1.4;
+        margin-bottom: 14px;
       }
 
       .slider-prompt-label {
-        font-size: 20px;
+        font-size: 22px;
+        margin-bottom: 8px;
       }
 
       .slider-live-number {
-        font-size: 52px;
-        min-height: 58px;
+        font-size: 58px;
+        min-height: 66px;
       }
 
       .slider-live-pct {
-        font-size: 26px;
+        font-size: 30px;
       }
 
-      .reveal-top-label {
-        font-size: 20px;
-        margin-bottom: 10px;
-      }
-
-      .reveal-voice-label {
-        font-size: 32px;
-        min-height: 44px;
-      }
-
-      .reveal-guess-marker-label {
-        font-size: 18px;
-      }
-
-      .reveal-delta-number {
-        font-size: 28px;
-      }
-
-      /* Slightly taller buttons feel better on desktop */
-      .btn-primary        { min-height: 54px; font-size: 18px; }
-      .btn-primary.large  { min-height: 66px; font-size: 24px; }
-      .btn-secondary      { min-height: 54px; font-size: 17px; }
-
-      /* Question answer choices — more breathing room */
-      .answer-choice {
-        padding: 10px 14px;
-        border-radius: 10px;
-      }
-
-      .answer-choice-text {
+      .slider-drag-hint {
         font-size: 16px;
       }
 
-      /* Splash screen rules — slightly larger on desktop */
-      .splash-rule-text {
+      /* Answer choices — bigger text, more breathing room */
+      .answer-choice {
+        padding: 13px 18px;
+        border-radius: 12px;
+        gap: 14px;
+      }
+
+      .answer-choice-letter {
+        font-size: 19px;
+        min-width: 24px;
+      }
+
+      .answer-choice-text {
+        font-size: 19px;
+        line-height: 1.4;
+      }
+
+      /* Reveal screen */
+      .reveal-top-label {
+        font-size: 22px;
+        margin-bottom: 12px;
+        letter-spacing: 0.1em;
+      }
+
+      .reveal-voice-label {
+        font-size: 36px;
+        min-height: 50px;
+        margin-bottom: 24px;
+      }
+
+      .reveal-guess-marker-label {
+        font-size: 20px;
+      }
+
+      .reveal-delta-number {
+        font-size: 30px;
+      }
+
+      .reveal-recap-q {
+        font-size: 20px;
+        line-height: 1.45;
+        margin-bottom: 12px;
+      }
+
+      .reveal-answer-card-label {
+        font-size: 18px;
+        margin-bottom: 9px;
+      }
+
+      .reveal-answer-card-text {
         font-size: 22px;
       }
 
-      /* Title screen — let the logo breathe at full width */
+      /* End screen */
+      .end-avg-intro   { font-size: 24px; }
+      .end-subhead     { font-size: 22px; }
+      .end-headline    { font-size: clamp(48px, 8vw, 68px); }
+
+      .percentile-label-top,
+      .percentile-label-bot { font-size: 16px; letter-spacing: 0.1em; }
+
+      .highlight-question { font-size: 17px; }
+      .highlight-answer   { font-size: 15px; }
+      .highlight-big-num  { font-size: 54px; }
+      .highlight-num-label { font-size: 13px; }
+
+      /* Progress labels */
+      .progress-q-label   { font-size: 16px; }
+      .progress-avg-label { font-size: 16px; }
+
+      /* Buttons */
+      .btn-primary        { min-height: 58px; font-size: 20px; }
+      .btn-primary.large  { min-height: 68px; font-size: 26px; }
+      .btn-secondary      { min-height: 58px; font-size: 19px; }
+
+      /* Splash screen */
+      .splash-rule-text { font-size: 24px; line-height: 1.5; }
+      .splash-rule-icon { font-size: 34px; }
+
+      /* Title screen */
       .dict-chunk {
-        font-size: 72px;
+        font-size: 80px;
       }
 
       .dict-definition {
-        font-size: 28px;
-        max-width: 480px;
+        font-size: 30px;
+        max-width: 520px;
+        line-height: 1.7;
       }
 
       .dict-phonetic {
-        font-size: 25px;
+        font-size: 27px;
       }
 
-      /* Progress meta row — slightly more padding */
+      .title-begin-btn {
+        font-size: 22px;
+        min-height: 62px;
+        width: 280px;
+      }
+
+      /* App title bar */
+      .app-title-bar-text { font-size: 32px; }
+
+      /* Progress meta row */
       .progress-meta-row {
         padding: 10px 24px 0;
       }
 
-      /* Screen padding increases with the wider shell */
+      /* Screen padding */
       .screen {
-        padding: 18px 28px 40px;
+        padding: 20px 32px 48px;
       }
 
-      /* End screen headline scales up */
-      .end-headline {
-        font-size: clamp(44px, 7vw, 64px);
-      }
-
-      .end-avg-intro {
-        font-size: 22px;
-      }
+      /* Debrief modal */
+      .debrief-row-question { font-size: 22px; }
+      .debrief-row-answer   { font-size: 20px; }
+      .debrief-big-num      { font-size: clamp(38px, 7vw, 50px); }
+      .debrief-num-label    { font-size: 15px; }
     }
   `}</style>
 );
