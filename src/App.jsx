@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Analytics } from "@vercel/analytics/react";
-import questionsData from "./pew-questions-v4.json"; 
+import questionsData from "./pew-questions-v4.json";
 
 // ─── SEEN QUESTIONS ───────────────────────────────────────────────────────────
 const seenIds = new Set();
@@ -8,7 +8,7 @@ const seenIds = new Set();
 // ── Supabase score DB ──────────────────────────────────────────────────────────
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
- 
+
 async function saveScore(avg) {
   try {
     const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
@@ -737,6 +737,178 @@ const GlobalStyles = () => (
     .number-celebrate { animation:numberCelebrate 1.2s cubic-bezier(0.34,1.4,0.64,1) forwards; }
     @keyframes deltaBounce { 0%{transform:scale(0.5);opacity:0} 55%{transform:scale(1.12)} 75%{transform:scale(0.94)} 90%{transform:scale(1.04)} 100%{transform:scale(1);opacity:1} }
     .delta-bounce { animation:deltaBounce 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+    /* ══════════════════════════════════════════════════════
+       DESKTOP AMBIENT BACKGROUND LAYER
+       Hidden on mobile. Reacts to bgState data attribute.
+       All color transitions: 1.5s ease — mood, not UI.
+    ══════════════════════════════════════════════════════ */
+    .desktop-bg {
+      display: none; /* mobile: never shown */
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DESKTOP RESPONSIVE — fires at 768px and above ONLY.
+       Zero changes to mobile layout. Every rule below is
+       scoped to this media query.
+    ══════════════════════════════════════════════════════ */
+    @media (min-width: 768px) {
+
+      /* ── Background layer ── */
+      .desktop-bg {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        /* Default idle state — neutral base, no color */
+        background: radial-gradient(
+          ellipse 70% 70% at 50% 50%,
+          rgba(45, 42, 94, 0.0) 0%,
+          transparent 100%
+        );
+        transition: background 1.5s ease, box-shadow 1.5s ease;
+      }
+
+      /* close (delta ≤ 10) — green pulse */
+      .desktop-bg[data-bgstate="close"] {
+        background:
+          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(61, 184, 122, 0.13) 0%, transparent 65%),
+          radial-gradient(ellipse 50% 50% at 30% 70%, rgba(198, 255, 0, 0.07) 0%, transparent 60%);
+      }
+
+      /* notbad (delta 11–19) — amber warmth */
+      .desktop-bg[data-bgstate="notbad"] {
+        background:
+          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(245, 166, 35, 0.12) 0%, transparent 65%),
+          radial-gradient(ellipse 40% 40% at 70% 30%, rgba(245, 166, 35, 0.06) 0%, transparent 55%);
+      }
+
+      /* off (delta ≥ 20) — coral edge bleed */
+      .desktop-bg[data-bgstate="off"] {
+        background:
+          radial-gradient(ellipse 90% 80% at 50% 50%, rgba(232, 99, 74, 0.13) 0%, transparent 65%),
+          radial-gradient(ellipse 40% 50% at 20% 80%, rgba(255, 45, 45, 0.06) 0%, transparent 55%);
+      }
+
+      /* end — slow lime/amber pulse via animation */
+      .desktop-bg[data-bgstate="end"] {
+        background:
+          radial-gradient(ellipse 80% 70% at 50% 60%, rgba(198, 255, 0, 0.10) 0%, transparent 60%),
+          radial-gradient(ellipse 50% 40% at 70% 20%, rgba(245, 166, 35, 0.08) 0%, transparent 55%);
+        animation: endBgPulse 5s ease-in-out infinite;
+      }
+
+      @keyframes endBgPulse {
+        0%,100% { opacity: 1; }
+        50%      { opacity: 0.55; }
+      }
+
+      /* ── Shell widening ── */
+      .app-shell {
+        position: relative;
+        z-index: 1;
+        max-width: 720px;
+        /* Subtle color-matched outer glow on the card — transitions with bgState */
+        transition: box-shadow 1.5s ease;
+      }
+
+      /* Glow states on the shell — matches bg color story */
+      .app-shell.bg-close  { box-shadow: 0 0 80px rgba(61, 184, 122, 0.18), 0 0 200px rgba(61, 184, 122, 0.06); }
+      .app-shell.bg-notbad { box-shadow: 0 0 80px rgba(245, 166, 35, 0.16), 0 0 200px rgba(245, 166, 35, 0.05); }
+      .app-shell.bg-off    { box-shadow: 0 0 80px rgba(232, 99, 74, 0.18),  0 0 200px rgba(232, 99, 74, 0.06); }
+      .app-shell.bg-end    { box-shadow: 0 0 100px rgba(198, 255, 0, 0.14), 0 0 240px rgba(245, 166, 35, 0.07); }
+
+      /* ── Font bumps — desktop only ── */
+      .q-text {
+        font-size: 22px;
+        line-height: 1.35;
+      }
+
+      .slider-prompt-label {
+        font-size: 20px;
+      }
+
+      .slider-live-number {
+        font-size: 52px;
+        min-height: 58px;
+      }
+
+      .slider-live-pct {
+        font-size: 26px;
+      }
+
+      .reveal-top-label {
+        font-size: 20px;
+        margin-bottom: 10px;
+      }
+
+      .reveal-voice-label {
+        font-size: 32px;
+        min-height: 44px;
+      }
+
+      .reveal-guess-marker-label {
+        font-size: 18px;
+      }
+
+      .reveal-delta-number {
+        font-size: 28px;
+      }
+
+      /* Slightly taller buttons feel better on desktop */
+      .btn-primary        { min-height: 54px; font-size: 18px; }
+      .btn-primary.large  { min-height: 66px; font-size: 24px; }
+      .btn-secondary      { min-height: 54px; font-size: 17px; }
+
+      /* Question answer choices — more breathing room */
+      .answer-choice {
+        padding: 10px 14px;
+        border-radius: 10px;
+      }
+
+      .answer-choice-text {
+        font-size: 16px;
+      }
+
+      /* Splash screen rules — slightly larger on desktop */
+      .splash-rule-text {
+        font-size: 22px;
+      }
+
+      /* Title screen — let the logo breathe at full width */
+      .dict-chunk {
+        font-size: 72px;
+      }
+
+      .dict-definition {
+        font-size: 28px;
+        max-width: 480px;
+      }
+
+      .dict-phonetic {
+        font-size: 25px;
+      }
+
+      /* Progress meta row — slightly more padding */
+      .progress-meta-row {
+        padding: 10px 24px 0;
+      }
+
+      /* Screen padding increases with the wider shell */
+      .screen {
+        padding: 18px 28px 40px;
+      }
+
+      /* End screen headline scales up */
+      .end-headline {
+        font-size: clamp(44px, 7vw, 64px);
+      }
+
+      .end-avg-intro {
+        font-size: 22px;
+      }
+    }
   `}</style>
 );
 
@@ -1149,7 +1321,7 @@ shuffledChoices.current = moveToEnd(shuffled);
 }
 
 // ─── REVEAL SCREEN ────────────────────────────────────────────────────────────
-function RevealScreen({ question, guess, onNext, isLast, animClass }) {
+function RevealScreen({ question, guess, onNext, isLast, animClass, onBgState }) {
   const [runCount,  setRunCount]  = useState(false);
   const [showDelta, setShowDelta] = useState(false);
   const [flashType, setFlashType] = useState(null);
@@ -1166,6 +1338,12 @@ function RevealScreen({ question, guess, onNext, isLast, animClass }) {
   const countedValue = useCountUp(Math.round(realPct), 1400, runCount);
 
   useEffect(() => {
+    // Signal background state to root (desktop only — ignored on mobile)
+    if (onBgState) {
+      if (delta <= 10) onBgState("close");
+      else if (delta <= 19) onBgState("notbad");
+      else onBgState("off");
+    }
     const t1 = setTimeout(() => setRunCount(true), 120);
     const t2 = setTimeout(() => setBarWave(true), 1500);
     const t3 = setTimeout(() => setShowDelta(true), 1650);
@@ -1473,6 +1651,7 @@ export default function App() {
   const [showShare,   setShowShare]   = useState(false);
   const [qAnim,       setQAnim]       = useState("screen-enter");
   const [percentile,  setPercentile]  = useState(null);
+  const [bgState,     setBgState]     = useState("idle"); // desktop ambient bg
   const questions = questionsData.questions;
 
   // Enter key fires primary action — debounced to prevent double-fire during transitions
@@ -1500,6 +1679,7 @@ export default function App() {
     const r = buildRound(questions);
     finalGuessesRef.current = [];
     qIndexRef.current = 0;
+    setBgState("idle");
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
   }, [questions]);
@@ -1513,6 +1693,7 @@ export default function App() {
     finalGuessesRef.current = [];
     lastGuessRef.current = null;
     qIndexRef.current = 0;
+    setBgState("idle");
     const r = buildRound(questions);
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
@@ -1535,6 +1716,7 @@ export default function App() {
       setGuesses(newGuesses);
       const finalAvg = avgDeviation(newGuesses);
       setPercentile(null);
+      setBgState("end");
       setScreen("end");
       // Skip saving if all 7 guesses are 50 — test round
       const isTestRound = newGuesses.every(g => g.guess === 50);
@@ -1550,6 +1732,7 @@ export default function App() {
     setTimeout(() => {
       qIndexRef.current = qi + 1;             // advance ref synchronously before render
       setQIndex(qi + 1);
+      setBgState("idle");                     // reset bg immediately on new question
       setScreen("question");
       setQAnim("screen-enter");
     }, 160);
@@ -1563,7 +1746,9 @@ export default function App() {
     <>
       <Analytics />
       <GlobalStyles />
-      <div className="app-shell">
+      {/* Desktop ambient background — display:none on mobile via CSS */}
+      <div className="desktop-bg" data-bgstate={bgState} aria-hidden="true" />
+      <div className={`app-shell bg-${bgState}`}>
         {showTitleBar && (
           <div className="app-title-bar">
             <span className="app-title-bar-text"><span className="kt-know">KNOW</span><span className="kt-tient">TIENT</span></span>
@@ -1577,7 +1762,7 @@ export default function App() {
             <QuestionScreen key={round[qIndex].id} question={round[qIndex]} onSubmit={handleSubmit} animClass={qAnim} />
           )}
           {screen === "reveal" && round.length > 0 && qIndex < round.length && round[qIndex] && (
-            <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} />
+            <RevealScreen key={`reveal-${round[qIndex].id}`} question={round[qIndex]} guess={lastGuess} onNext={handleNext} isLast={qIndex+1>=TOTAL} animClass={qAnim} onBgState={setBgState} />
           )}
           {screen === "end" && (
             <EndScreen round={round} guesses={finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses} onPlayAgain={handlePlayAgain} onShare={() => setShowShare(true)} avg={avgDeviation(finalGuessesRef.current.length===round.length?finalGuessesRef.current:guesses)} percentile={percentile} />
