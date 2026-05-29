@@ -979,12 +979,19 @@ const GlobalStyles = () => (
 const BIBLE_IDS    = new Set(['pew_religion_2019_001','pew_religion_2019_002','pew_religion_2019_012','pew_religion_2019_025']);
 const REGIONAL_RELIGION_IDS = new Set(['pew_intl_2022_003']);
 
-const OMIT_IDS     = new Set(['pew_sci_2019_002']); // ear infection — omitted permanently
+const OMIT_IDS          = new Set(['pew_sci_2019_002']); // ear infection — omitted permanently
+const FIRST_ROUND_OMIT  = new Set(['pew_intl_2022_003']); // Latin America dominant religion — round 2+ only
 const JUDAISM_IDS  = new Set(['pew_religion_2019_007','pew_religion_2019_017','pew_religion_2019_020','pew_religion_2019_023','pew_religion_2019_030']);
 
-function buildRound(allQuestions, _depth=0) {
+function buildRound(allQuestions, roundNumber=1, _depth=0) {
   const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
-  const unflagged = allQuestions.filter(q => !q.flagged && !q.image_dependent && !OMIT_IDS.has(q.id));
+  const isFirstRound = roundNumber === 1;
+  const unflagged = allQuestions.filter(q =>
+    !q.flagged &&
+    !q.image_dependent &&
+    !OMIT_IDS.has(q.id) &&
+    !(isFirstRound && FIRST_ROUND_OMIT.has(q.id))
+  );
 
   const getAvailable = () => unflagged.filter(q => !seenIds.has(q.id));
   let available = getAvailable();
@@ -1100,7 +1107,7 @@ function buildRound(allQuestions, _depth=0) {
       return deduped;
     }
     seenIds.clear();
-    return buildRound(allQuestions, _depth + 1);
+    return buildRound(allQuestions, roundNumber, _depth + 1);
   }
   deduped.forEach(q => seenIds.add(q.id));
   return deduped;
@@ -1714,6 +1721,7 @@ export default function App() {
   const [qAnim,       setQAnim]       = useState("screen-enter");
   const [percentile,  setPercentile]  = useState(null);
   const [bgState,     setBgState]     = useState("idle"); // desktop ambient bg
+  const [roundNumber, setRoundNumber] = useState(1);      // 1 = first round, 2+ unlocks all questions
   const questions = questionsData.questions;
 
   // Enter key fires primary action — debounced to prevent double-fire during transitions
@@ -1738,9 +1746,10 @@ export default function App() {
   const startRound = useCallback(() => {
     // Resume audio context on each new round (mobile browsers suspend it)
     try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {}
-    const r = buildRound(questions);
+    const r = buildRound(questions, 1);  // always round 1 — called from splash
     finalGuessesRef.current = [];
     qIndexRef.current = 0;
+    setRoundNumber(1);
     setBgState("idle");
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
@@ -1755,11 +1764,13 @@ export default function App() {
     finalGuessesRef.current = [];
     lastGuessRef.current = null;
     qIndexRef.current = 0;
+    const nextRound = roundNumber + 1;
+    setRoundNumber(nextRound);
     setBgState("idle");
-    const r = buildRound(questions);
+    const r = buildRound(questions, nextRound);  // round 2+ unlocks all questions
     setRound(r); setQIndex(0); setGuesses([]); setLastGuess(null);
     setShowShare(false); setScreen("question"); setQAnim("screen-enter");
-  }, [questions]);
+  }, [questions, roundNumber]);
 
   const handleSubmit = (guess) => {
     lastGuessRef.current = guess;  // sync, available immediately
