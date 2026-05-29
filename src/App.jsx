@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Analytics } from "@vercel/analytics/react";
-import questionsData from "./pew-questions-v4.json";
+import questionsData from "./pew-questions-v4.json"; 
 
 // ─── SEEN QUESTIONS ───────────────────────────────────────────────────────────
 const seenIds = new Set();
