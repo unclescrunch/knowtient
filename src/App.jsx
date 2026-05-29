@@ -8,7 +8,7 @@ const seenIds = new Set();
 // ── Supabase score DB ──────────────────────────────────────────────────────────
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
+ 
 async function saveScore(avg) {
   try {
     const res = await fetch(`${SUPA_URL}/rest/v1/scores`, {
